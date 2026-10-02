@@ -1,0 +1,72 @@
+# forge — working on the harness itself
+
+This repository **is the factory**, not a project that uses the factory. Nothing
+here is wired up: there is no `forge.json` at the root, no board, no knowledge
+base, and `.claude/scripts/` belongs to `template/`, not to this session. Do not
+run `agile.py` or `kb.py` against this repo, and do not install the harness into
+it.
+
+```
+bin/forge                 the installer and renderer
+template/                 the payload copied into a project — the actual product
+docs/                     how the harness works, and how to extend it
+tests/smoke.sh            installs into a throwaway repo and proves every gate fires
+```
+
+## The one rule that keeps the harness reusable
+
+> Nothing in `template/` may name a project, a stack, a branch, a scope or a
+> command.
+
+Everything project-specific is read at runtime from `forge.json`:
+
+- scripts call `forge.load(root)` and take their vocabulary from it;
+- skills and commands tell the agent to run `python3 .claude/scripts/forge.py
+  scopes` / `checks <scope>` rather than restating a matrix;
+- `template/.claude/agents/_engineer.md.tmpl` is rendered per scope by
+  `bin/forge`, and it is the only file with `{{PLACEHOLDERS}}`.
+
+If you find yourself writing "backend" or "npm" into a file under `template/`,
+it belongs in `forge.json` or in the engineer template instead. The two
+`forge.example.*.json` files are where concrete stacks are allowed to appear.
+
+## After any change under `template/`
+
+```bash
+tests/smoke.sh
+```
+
+It installs into a temporary repository and asserts the gates still fire. A
+change to `agile.py`, `kb.py` or a hook without a passing smoke run is not
+finished.
+
+Changing a validation rule means changing it in **both** places: `validate()` in
+`template/.claude/scripts/agile.py` and the invariant list in
+`template/docs/agile/SCHEMA.md` §6. The script wins when they disagree, which is
+precisely why the prose must not drift from it.
+
+Adding a frontmatter field means four edits: `SCHEMA.md`, the required-fields
+list in the script, the skill that teaches the field, and the smoke test.
+
+## Writing style for the payload
+
+The files under `template/` are read by an agent mid-task, with no memory of
+this session, and they are what the agent will obey. Write them accordingly:
+
+- state the rule, then why it exists — a rule whose reason is invisible gets
+  optimised away by the next agent;
+- prefer a command the agent can run over a fact it has to trust;
+- name the failure the rule prevents. "Do not edit `INDEX.md`" is weaker than
+  the sentence explaining that a hook will deny it and the board regenerates
+  anyway.
+
+## Compatibility
+
+Stdlib-only Python 3.9+. The hooks run on every turn in every installed project,
+so a third-party import here is a dependency tree in someone else's repository.
+`bin/forge` has the same constraint.
+
+When a change to the payload would break an existing installation — a renamed
+field, a moved path — say so in the commit body and make `forge upgrade` handle
+it, or make `forge.py doctor` report it. A project upgrades by running the CLI,
+not by reading a changelog.

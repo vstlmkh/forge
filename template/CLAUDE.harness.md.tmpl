@@ -1,0 +1,122 @@
+<!-- forge:begin - managed by the forge harness; re-rendered by `forge upgrade` -->
+# {{PROJECT_NAME}} — agent harness
+
+{{REPO_TABLE}}
+
+## Two records: the tracker and the knowledge base
+
+`docs/agile/` is **what we are doing**. `docs/knowledge/` is **what we know**. A
+ticket is closed and forgotten; a note outlives it. Both are plain Markdown
+committed here, both have a generated `INDEX.md` you must never edit, and both
+have a validator that exits 2 when they drift.
+
+`forge.json` is the third record: **what this project is shaped like** — its
+repositories, scopes, owning agents and runnable checks. Read it rather than
+assuming:
+
+```bash
+python3 .claude/scripts/forge.py scopes
+python3 .claude/scripts/forge.py checks <scope>
+python3 .claude/scripts/forge.py doctor
+```
+
+## Work goes through the tracker
+
+Read [`docs/agile/README.md`](docs/agile/README.md) before starting anything;
+[`docs/agile/SCHEMA.md`](docs/agile/SCHEMA.md) is the specification.
+
+```
+/agile:board            what is going on
+/agile:groom <request>  turn a request into tickets
+/agile:next             what to work on
+/agile:work <ID>        QA writes failing tests → implement → QA reviews, stops at verify
+/agile:close <ID>       merge, record the sha, close
+/agile:bug <symptom>    file and triage a defect
+```
+
+## Knowledge goes through the knowledge base
+
+```
+docs/knowledge/<scope>/<type>/{<type>} <description> - <yyyy-mm-dd>.md
+```
+
+`<type>` is one of `business-rule`, `troubleshooting`, `overview`,
+`integration`, `api-contract`, `decision`, `runbook`, `data-model`. **The braces
+around the type are literal**, the description is lowercase words separated by
+spaces, and the created date follows a ` - ` separator. Paths therefore need
+quoting — let `kb.py` print them rather than retyping. The specification is
+[`docs/knowledge/README.md`](docs/knowledge/README.md); the procedure the agents
+follow is `.claude/skills/project-knowledge/SKILL.md`.
+
+```
+/kb:consult <subject>  what do we already know?
+/kb:new <finding>      file it, correctly typed and cross-linked
+/kb:audit              gaps, misfilings, staleness, broken links
+/kb:lint               validate the knowledge base and the tracker's links into it
+
+python3 .claude/scripts/kb.py find <keyword> [...]     # search, exit 2 = a gap
+python3 .claude/scripts/kb.py for-ticket <TICKET-ID>   # the ticket's reading list
+python3 .claude/scripts/kb.py new <type> <scope> "<description>" --ticket <ID>
+python3 .claude/scripts/kb.py related "<basename>"     # one hop along the graph
+```
+
+**Consulting the knowledge base is a step of the cycle, not optional reading.**
+Before changing business logic, an integration, a domain workflow or the
+architecture, search it. After the work reveals something durable, file it — one
+finding per note, under the right type, cross-linked in `## Related` in both
+directions. Where a note and the code disagree, **the code wins**: say so, and
+fix the note.
+{{KB_CALLOUT}}
+Agents: {{AGENT_LIST}} in `.claude/agents/`. Their operating rules live in
+`.claude/skills/agile-{artifacts,grooming,git,dod}/` and
+`.claude/skills/project-knowledge/`.
+
+## Rules that are not negotiable
+
+- **Both `INDEX.md` files are generated.** Never edit `docs/agile/INDEX.md` or
+  `docs/knowledge/INDEX.md`. Change the ticket or the note and let
+  `agile.py index` / `kb.py index` regenerate them. A hook denies the write
+  anyway.
+- **Every task and bug carries `docs:`.** It is the knowledge-base notes read at
+  grooming and actualised at close. A ticket at `review` or beyond with an empty
+  `docs:` and no `docs_waiver: NO-DOCS (<reason>)` fails `agile.py lint` — the
+  same idiom as `NO-TEST` and `SKIPPED`: not everything must be documented, but
+  a decision not to document must be visible and argued.
+- **A note is created by `kb.py new`, never by hand.** The path, the frontmatter
+  and the required sections all come out right; a `PreToolUse` hook refuses a
+  misfiled or misnamed file under `docs/knowledge/`. `overview` is not the
+  default type — a rule is a `business-rule`, an incident is `troubleshooting`,
+  an external system is an `integration`.
+- **A task's `scope` is exactly one** of {{SCOPE_LIST}}. Anything spanning two
+  is two tasks under one story.
+- **One active ticket per working tree**, counting `writing_tests` as active. A
+  second concurrent ticket in the same repository corrupts the first.
+- **The cycle is test-first.** `qa` claims a ticket out of `todo` into
+  `writing_tests`, writes a failing test per acceptance criterion and proves it
+  red *before* an engineer starts. There is no `todo -> in_progress`. Where no
+  automated test is possible, `qa` records a `NO-TEST (<reason>)` waiver naming
+  the substitute check.
+- **An engineer never edits the tests `qa` wrote.** It continues on `qa`'s
+  branch and implements until they pass. A test it believes is wrong goes back
+  via `in_progress -> writing_tests`, argued in `## Log` — never edited, skipped
+  or loosened. QA diffs the test files at the review gate, and that diff is
+  expected to be empty.
+- **Nobody closes their own work.** An engineer stops at `review`, QA moves it to
+  `verify`, `verify` means awaiting the user's acceptance, and only the top-level
+  session sets `done` inside `/agile:close`.
+- **An unavailable check is `SKIPPED (<reason> — see TASK-000X)`, never a pass.**
+  The matrix is `python3 .claude/scripts/forge.py checks <scope>`.
+- **Every code commit carries a `Refs: <TICKET-ID>` trailer.** Conventional
+  Commits, third-person verb: `feat: adds price per day to the subscription
+  resource`.
+- Never commit anything on the project's never-commit list (`git.never_commit`
+  in `forge.json`). Never push with `--no-verify`.
+
+## Verify your work before handing it back
+
+```bash
+python3 .claude/scripts/agile.py lint     # exit 2 means the tracker is inconsistent
+python3 .claude/scripts/kb.py lint        # exit 2 means the knowledge base is inconsistent
+python3 .claude/scripts/forge.py doctor   # exit 2 means the harness config drifted
+```
+<!-- forge:end -->
