@@ -196,6 +196,32 @@ printf '%s' "$OUT" | grep -q "backend/app" \
   && ok "detect finds an application nested inside a submodule" \
   || bad "detect did not look inside the submodule"
 
+echo "== attribution"
+grep -q "github.com/vstlmkh/forge" docs/agile/INDEX.md \
+  && ok "the generated board carries the forge line" || bad "the board is unsigned"
+grep -q "github.com/vstlmkh/forge" docs/knowledge/INDEX.md \
+  && ok "the generated knowledge index carries it too" || bad "the knowledge index is unsigned"
+grep -q "github.com/vstlmkh/forge" CLAUDE.md \
+  && ok "the managed CLAUDE.md block carries it" || bad "the CLAUDE.md block is unsigned"
+grep -q "github.com/vstlmkh/forge" .claude/agents/api-engineer.md \
+  && ok "a rendered agent says what generated it" || bad "the rendered agent is unsigned"
+for f in docs/agile/tasks/TASK-0001-first-task.md docs/agile/SCHEMA.md; do
+  grep -q "github.com/vstlmkh/forge" "$f" && bad "forge signed $f, which it does not generate"
+done
+ok "nothing forge did not generate was signed"
+
+OFF="$WORK/../forge-smoke-noattr-$$"
+rm -rf "$OFF"; mkdir -p "$OFF/apps/web"
+git -C "$OFF" init -q
+echo '{"name":"w","scripts":{"test":"jest"}}' > "$OFF/apps/web/package.json"
+"$FORGE/bin/forge" init "$OFF" --auto --name NoAttr --no-attribution >/dev/null 2>&1
+( cd "$OFF" && python3 .claude/scripts/agile.py index >/dev/null 2>&1
+  python3 .claude/scripts/kb.py index >/dev/null 2>&1 )
+if grep -rq "github.com/vstlmkh/forge" "$OFF/docs" "$OFF/CLAUDE.md" "$OFF/.claude/agents" 2>/dev/null
+then bad "--no-attribution left a mark behind"
+else ok "--no-attribution removes every instance"; fi
+rm -rf "$OFF"
+
 echo "== installer"
 INST="$WORK/../forge-smoke-install-$$"
 rm -rf "$INST"

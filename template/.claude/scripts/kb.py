@@ -412,6 +412,10 @@ def render_index(root: str, notes: list[Note], issues: list[agile.Issue]) -> str
             out.append(f"- `{i.rel}` **{i.field}** - {i.level}: {i.msg}")
         out.append("")
 
+    credit = cfg.credit()
+    if credit:
+        out += ["---", "", credit, ""]
+
     return "\n".join(out).rstrip() + "\n"
 
 

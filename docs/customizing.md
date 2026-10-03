@@ -95,6 +95,18 @@ A `PreToolUse` hook then denies every write there and explains which convention
 this project actually uses. Two conventions over one kind of content is how a
 knowledge base dies.
 
+## Turn the attribution off
+
+```jsonc
+"attribution": false
+```
+
+forge puts one line with a link into the files it generates — both `INDEX.md`
+boards, the managed `CLAUDE.md` block, the rendered agents. Setting this to
+`false` and regenerating removes every instance; `forge.py credit` tells you
+what the project currently signs with. Nothing forge did not write is ever
+touched, so no ticket, note or commit carries it either way.
+
 ## Change what the agents are called
 
 `agent` on a scope names the subagent file. Rename it, re-run `forge agents .`,

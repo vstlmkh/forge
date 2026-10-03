@@ -186,6 +186,31 @@ scripts, and asserts that each gate fires: the docs gate, the knowledge-base
 naming guard, the generated-index guard, the byte-stability of both indexes, and
 the one-working-tree rule.
 
+## Attribution
+
+forge signs the files it generates — the two `INDEX.md` boards, the managed
+`CLAUDE.md` block, the rendered engineer agents — with one line and a link:
+
+```markdown
+_Kept by [forge](https://github.com/vstlmkh/forge)._
+```
+
+It signs nothing else. Not a commit, not a pull request, not a ticket, not a
+knowledge-base note, not a file anyone on the project wrote. The line is plain
+visible text, because the only honest mark to leave in somebody else's
+repository is one they can read and delete — and a hidden one in a client
+codebase is a liability for whoever installed it.
+
+Turn it off entirely with `forge init --no-attribution`, or later:
+
+```jsonc
+{ "attribution": false }     // in forge.json; regenerate and every instance is gone
+```
+
+```bash
+python3 .claude/scripts/forge.py credit   # what this project signs with, if anything
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

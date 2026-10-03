@@ -1,13 +1,35 @@
 {
   "forge_version": "1.0.0",
+  "generator": {
+    "name": "forge",
+    "url": "https://github.com/vstlmkh/forge",
+    "version": "1.0.0"
+  },
+  "attribution": true,
   "project": {
     "name": "MealPlan",
     "description": "A super-repo tying two product submodules, the tracker and the knowledge base together."
   },
   "repos": {
-    "harness":  { "path": ".",         "branch": "master", "remote": "acme/mealplan-harness", "submodule": false, "role": "harness" },
-    "backend":  { "path": "backend",   "branch": "master", "remote": "acme/MealPlan-Back",    "submodule": true },
-    "frontend": { "path": "frontend",  "branch": "main",   "remote": "acme/MealPlan",         "submodule": true }
+    "harness": {
+      "path": ".",
+      "branch": "master",
+      "remote": "acme/mealplan-harness",
+      "submodule": false,
+      "role": "harness"
+    },
+    "backend": {
+      "path": "backend",
+      "branch": "master",
+      "remote": "acme/MealPlan-Back",
+      "submodule": true
+    },
+    "frontend": {
+      "path": "frontend",
+      "branch": "main",
+      "remote": "acme/MealPlan",
+      "submodule": true
+    }
   },
   "scopes": {
     "backend": {
@@ -25,43 +47,160 @@
       "stack": "Next.js 16, React 19, TypeScript, Tailwind, Storybook",
       "workdir": "frontend"
     },
-    "infra": { "repo": null, "agent": ["backend-engineer", "frontend-engineer"], "kb_scope": "shared", "code": false },
-    "docs":  { "repo": null, "agent": ["backend-engineer", "frontend-engineer", "pm"], "kb_scope": "shared", "code": false }
+    "infra": {
+      "repo": null,
+      "agent": [
+        "backend-engineer",
+        "frontend-engineer"
+      ],
+      "kb_scope": "shared",
+      "code": false
+    },
+    "docs": {
+      "repo": null,
+      "agent": [
+        "backend-engineer",
+        "frontend-engineer",
+        "pm"
+      ],
+      "kb_scope": "shared",
+      "code": false
+    }
   },
   "checks": {
     "backend": [
-      { "id": "tests", "title": "Tests", "command": "docker compose -f docker-compose.local.yml exec app composer test", "cwd": "backend", "available": true },
-      { "id": "style", "title": "Style", "command": "docker compose -f docker-compose.local.yml exec app ./vendor/bin/pint --test", "cwd": "backend", "available": true },
-      { "id": "stan", "title": "Static analysis", "command": "docker compose -f docker-compose.local.yml exec app composer stan", "cwd": "backend", "available": true },
-      { "id": "ci", "title": "CI on PR", "command": "gh pr checks", "available": false, "blocked_by": "TASK-0004" }
+      {
+        "id": "tests",
+        "title": "Tests",
+        "command": "docker compose -f docker-compose.local.yml exec app composer test",
+        "cwd": "backend",
+        "available": true
+      },
+      {
+        "id": "style",
+        "title": "Style",
+        "command": "docker compose -f docker-compose.local.yml exec app ./vendor/bin/pint --test",
+        "cwd": "backend",
+        "available": true
+      },
+      {
+        "id": "stan",
+        "title": "Static analysis",
+        "command": "docker compose -f docker-compose.local.yml exec app composer stan",
+        "cwd": "backend",
+        "available": true
+      },
+      {
+        "id": "ci",
+        "title": "CI on PR",
+        "command": "gh pr checks",
+        "available": false,
+        "blocked_by": "TASK-0004"
+      }
     ],
     "frontend": [
-      { "id": "tests", "title": "Tests", "command": "npm test", "cwd": "frontend", "available": true },
-      { "id": "types", "title": "Types", "command": "npm run tsc", "cwd": "frontend", "available": true },
-      { "id": "lint", "title": "Lint", "command": "npm run lint:errors", "cwd": "frontend", "available": true },
-      { "id": "build", "title": "Production build", "command": "npm run build", "cwd": "frontend", "available": true },
-      { "id": "storybook", "title": "Storybook build", "command": "npm run build-storybook", "cwd": "frontend", "available": true, "when": "component work only; slow" }
+      {
+        "id": "tests",
+        "title": "Tests",
+        "command": "npm test",
+        "cwd": "frontend",
+        "available": true
+      },
+      {
+        "id": "types",
+        "title": "Types",
+        "command": "npm run tsc",
+        "cwd": "frontend",
+        "available": true
+      },
+      {
+        "id": "lint",
+        "title": "Lint",
+        "command": "npm run lint:errors",
+        "cwd": "frontend",
+        "available": true
+      },
+      {
+        "id": "build",
+        "title": "Production build",
+        "command": "npm run build",
+        "cwd": "frontend",
+        "available": true
+      },
+      {
+        "id": "storybook",
+        "title": "Storybook build",
+        "command": "npm run build-storybook",
+        "cwd": "frontend",
+        "available": true,
+        "when": "component work only; slow"
+      }
     ],
     "infra": [
-      { "id": "compose", "title": "Compose files parse", "command": "docker compose -f backend/docker-compose.local.yml config -q", "available": true }
+      {
+        "id": "compose",
+        "title": "Compose files parse",
+        "command": "docker compose -f backend/docker-compose.local.yml config -q",
+        "available": true
+      }
     ],
     "docs": [
-      { "id": "tracker", "title": "Tracker integrity", "command": "python3 .claude/scripts/agile.py lint", "available": true },
-      { "id": "kb", "title": "Knowledge-base integrity", "command": "python3 .claude/scripts/kb.py lint", "available": true }
+      {
+        "id": "tracker",
+        "title": "Tracker integrity",
+        "command": "python3 .claude/scripts/agile.py lint",
+        "available": true
+      },
+      {
+        "id": "kb",
+        "title": "Knowledge-base integrity",
+        "command": "python3 .claude/scripts/kb.py lint",
+        "available": true
+      }
     ]
   },
   "kb": {
-    "scopes": ["backend", "frontend", "shared"],
+    "scopes": [
+      "backend",
+      "frontend",
+      "shared"
+    ],
     "shared_scope": "shared",
-    "locked_types": { "api-contract": ["shared"] },
-    "forbidden_dirs": ["docs/wiki"]
+    "locked_types": {
+      "api-contract": [
+        "shared"
+      ]
+    },
+    "forbidden_dirs": [
+      "docs/wiki"
+    ]
   },
   "git": {
     "commit_style": "conventional-third-person",
     "require_refs_trailer": true,
     "pull_requests": true,
-    "branch_prefixes": ["feat", "fix", "chore", "style", "refactor", "docs", "test", "perf"],
-    "never_commit": [".env", "vendor/", "node_modules/", ".next/", "storage/", ".idea/"]
+    "branch_prefixes": [
+      "feat",
+      "fix",
+      "chore",
+      "style",
+      "refactor",
+      "docs",
+      "test",
+      "perf"
+    ],
+    "never_commit": [
+      ".env",
+      "vendor/",
+      "node_modules/",
+      ".next/",
+      "storage/",
+      ".idea/"
+    ]
   },
-  "policy": { "test_first": true, "require_docs": true, "stale_claim_hours": 24 }
+  "policy": {
+    "test_first": true,
+    "require_docs": true,
+    "stale_claim_hours": 24
+  }
 }

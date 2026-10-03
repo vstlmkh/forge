@@ -72,6 +72,17 @@ this session, and they are what the agent will obey. Write them accordingly:
   the sentence explaining that a hook will deny it and the board regenerates
   anyway.
 
+## Attribution
+
+forge signs what forge generates — both `INDEX.md` boards, the managed
+`CLAUDE.md` block, the rendered agents — and nothing else. Adding a signature
+anywhere a human or an agent writes (a commit trailer, a PR body, a ticket, a
+note) is out of bounds: those belong to the project, not to the tool. Keep it
+visible text with a link rather than a hidden mark, and keep
+`"attribution": false` working everywhere, including in anything new you teach
+forge to generate. `cfg.credit()` in the payload and `credit()` in `bin/forge`
+are the only two places that produce the line.
+
 ## Compatibility
 
 Stdlib-only Python 3.9+. The hooks run on every turn in every installed project,
