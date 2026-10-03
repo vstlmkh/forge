@@ -1,6 +1,6 @@
 {
   "name": "@vstlmkh/forge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A reusable agent harness for any repository: test-first ticket cycle, Markdown tracker, typed knowledge base, role agents and the hooks that keep them honest.",
   "keywords": [
     "agent",

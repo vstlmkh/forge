@@ -1,9 +1,9 @@
 {
-  "forge_version": "1.0.0",
+  "forge_version": "1.0.1",
   "generator": {
     "name": "forge",
     "url": "https://github.com/vstlmkh/forge",
-    "version": "1.0.0"
+    "version": "1.0.1"
   },
   "attribution": true,
   "project": {

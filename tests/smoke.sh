@@ -230,9 +230,12 @@ FORGE_REPO="$FORGE" FORGE_HOME="$INST/.forge" FORGE_BIN="$INST/bin" \
   sh "$FORGE/install.sh" >/dev/null 2>&1
 [ -L "$INST/bin/forge" ] && ok "installer links a shim onto the bin dir" \
   || bad "installer did not create the shim"
-[ "$("$INST/bin/forge" version 2>/dev/null)" = "$("$FORGE/bin/forge" version)" ] \
-  && ok "the shim runs, and finds template/ through the symlink" \
-  || bad "the shim could not run"
+# the installer clones a ref, so its version legitimately differs from an
+# edited working tree - assert that the shim runs, not that it matches
+case "$("$INST/bin/forge" version 2>/dev/null)" in
+  [0-9]*.[0-9]*.[0-9]*) ok "the shim runs, and finds template/ through the symlink" ;;
+  *) bad "the shim could not run" ;;
+esac
 FORGE_REPO="$FORGE" FORGE_HOME="$INST/.forge" FORGE_BIN="$INST/bin" \
   sh "$FORGE/install.sh" >/dev/null 2>&1 \
   && ok "re-running the installer updates in place" || bad "the installer is not re-runnable"
