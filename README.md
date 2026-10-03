@@ -5,6 +5,14 @@
   <img alt="forge — the cycle a ticket goes through, and the three records behind it" src="assets/banner-light.svg">
 </picture>
 
+[![npm](https://img.shields.io/npm/v/@vstlmkh/forge?logo=npm&color=cb3837)](https://www.npmjs.com/package/@vstlmkh/forge)
+[![downloads](https://img.shields.io/npm/dm/@vstlmkh/forge?color=cb3837)](https://www.npmjs.com/package/@vstlmkh/forge)
+[![license](https://img.shields.io/npm/l/@vstlmkh/forge?color=blue)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![node](https://img.shields.io/node/v/@vstlmkh/forge?logo=node.js&logoColor=white&color=339933&label=node)](https://nodejs.org/)
+[![dependencies](https://img.shields.io/badge/dependencies-none-2ea44f)](package.json)
+[![unpacked size](https://img.shields.io/npm/unpacked-size/@vstlmkh/forge?color=555)](https://www.npmjs.com/package/@vstlmkh/forge?activeTab=code)
+
 A reusable agent harness for software projects: a test-first development cycle,
 a Markdown tracker, a typed knowledge base, four role agents and the hooks that
 keep all of it honest — installable into any repository in one command.
