@@ -12,19 +12,36 @@ keep all of it honest — installable into any repository in one command.
 ## Install
 
 ```bash
-gh repo clone vstlmkh/forge ~/.forge && ~/.forge/install.sh
+gh api repos/vstlmkh/forge/contents/install.sh -H "Accept: application/vnd.github.raw" | sh
 ```
 
-or, over plain https:
+or, if you would rather clone first:
+
+```bash
+git clone https://github.com/vstlmkh/forge.git ~/.forge && ~/.forge/install.sh
+```
+
+The repository is **private**, which rules out the usual
+`curl … raw.githubusercontent.com/… | sh`: raw URLs do not see your git
+credentials and answer 404. `gh api` authenticates over the API, and a plain
+`git clone` over https works through whatever credential helper already holds
+your token. Once the repository is public, the short form works too:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vstlmkh/forge/master/install.sh | sh
 ```
 
-One git checkout in `~/.forge`, one `forge` shim in `~/.local/bin`, no
-packages, nothing compiled. Re-run the script any time to update, or run
-`forge self-update`. `FORGE_HOME`, `FORGE_BIN` and `FORGE_REF` override where it
-lands and which ref it tracks.
+One git checkout in `~/.forge`, one `forge` shim in `~/.local/bin`, no packages,
+nothing compiled. Re-run the installer any time to update, or run
+`forge self-update`. `FORGE_HOME`, `FORGE_BIN`, `FORGE_REF` and `FORGE_REPO`
+override where it lands, which ref it tracks and where it clones from.
+
+**On a machine with several GitHub accounts**, `gh repo clone` and
+`git@github.com:…` both fail with *Repository not found*: they use the default
+ssh key, which belongs to another account. The installer handles it — it tries
+https, then `git@github.com`, then every `Host` alias in `~/.ssh/config` whose
+`HostName` is `github.com`, and tells you which one worked. Nothing ever waits
+on a credential prompt, so piping it into `sh` cannot hang.
 
 ## Use it in a project
 
