@@ -1,5 +1,10 @@
 # forge
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+  <img alt="forge — the cycle a ticket goes through, and the three records behind it" src="assets/banner-light.svg">
+</picture>
+
 A reusable agent harness for software projects: a test-first development cycle,
 a Markdown tracker, a typed knowledge base, four role agents and the hooks that
 keep all of it honest — installable into any repository in one command.
@@ -28,13 +33,6 @@ is touched.
 | `forge.json` | **the only project-specific file**: repositories, scopes, owning agents, and the Definition-of-Done matrix |
 
 ## The cycle it enforces
-
-```
-       pm            qa              engineer           qa           you
-raw ──► todo ──► writing_tests ──► in_progress ──PR──► review ──► verify ──► done
-                     ▲   red tests      │  ▲              │          │
-                     └──test is wrong───┘  └───rejected────┴──────────┘
-```
 
 Four properties are load-bearing, and all four are checked by a script rather
 than trusted:
@@ -109,6 +107,7 @@ re-render those too), and rewrites only the `<!-- forge:begin -->` block in
 ```
 forge/
 ├── bin/forge              the installer
+├── assets/banner.py       regenerates the two README banners
 ├── template/              the payload that gets copied into a project
 │   ├── .claude/           agents, skills, commands, scripts, settings
 │   ├── docs/              the tracker and knowledge-base specifications

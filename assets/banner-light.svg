@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 580" width="1200" height="580" role="img" aria-label="forge - the cycle a ticket goes through, and the three records behind it">
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#b6bdc6"/></marker>
+</defs>
+<rect width="1200" height="580" fill="#ffffff"/>
+<rect x="0.5" y="0.5" width="1199" height="579" rx="14" fill="none" stroke="#d8dce1"/>
+<text x="56" y="88" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="52" font-weight="700" fill="#15181d" text-anchor="start" letter-spacing="-1.5">forge</text>
+<rect x="56" y="100" width="92" height="5" rx="2.5" fill="#c2410c"/>
+<text x="56" y="138" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="19" font-weight="400" fill="#636c76" text-anchor="start">A reusable agent harness for software projects.</text>
+<rect x="844" y="56" width="300" height="38" rx="8" fill="#f6f7f9" stroke="#d8dce1"/>
+<text x="994.0" y="80" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="middle">forge init</text>
+<text x="994.0" y="114" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" fill="#636c76" text-anchor="middle">installs into any repository</text>
+<text x="56" y="178" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#636c76" text-anchor="start" letter-spacing="1.8">THE CYCLE A TICKET GOES THROUGH</text>
+<text x="132.5" y="202" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#636c76" text-anchor="middle" letter-spacing="1.2">pm</text>
+<rect x="56" y="212" width="153" height="70" rx="10" fill="#f6f7f9" stroke="#d8dce1"/>
+<text x="132.5" y="242" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="middle">todo</text>
+<text x="132.5" y="264" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="400" fill="#636c76" text-anchor="middle">groomed, with criteria</text>
+<path d="M215 247.0 L235 247.0" stroke="#b6bdc6" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="319.5" y="202" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#c2410c" text-anchor="middle" letter-spacing="1.2">qa</text>
+<rect x="243" y="212" width="153" height="70" rx="10" fill="#fff3ec" stroke="#f0b494"/>
+<text x="319.5" y="242" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="middle">writing_tests</text>
+<text x="319.5" y="264" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="400" fill="#636c76" text-anchor="middle">a failing test each</text>
+<path d="M402 247.0 L422 247.0" stroke="#b6bdc6" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="506.5" y="202" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#0f766e" text-anchor="middle" letter-spacing="1.2">engineer</text>
+<rect x="430" y="212" width="153" height="70" rx="10" fill="#eefaf7" stroke="#9ad3c9"/>
+<text x="506.5" y="242" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="middle">in_progress</text>
+<text x="506.5" y="264" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="400" fill="#636c76" text-anchor="middle">makes them pass</text>
+<path d="M589 247.0 L609 247.0" stroke="#b6bdc6" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="693.5" y="202" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#c2410c" text-anchor="middle" letter-spacing="1.2">qa</text>
+<rect x="617" y="212" width="153" height="70" rx="10" fill="#fff3ec" stroke="#f0b494"/>
+<text x="693.5" y="242" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="middle">review</text>
+<text x="693.5" y="264" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="400" fill="#636c76" text-anchor="middle">were they weakened?</text>
+<path d="M776 247.0 L796 247.0" stroke="#b6bdc6" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="880.5" y="202" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#5b43b5" text-anchor="middle" letter-spacing="1.2">you</text>
+<rect x="804" y="212" width="153" height="70" rx="10" fill="#f2effc" stroke="#bfb0ea"/>
+<text x="880.5" y="242" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="middle">verify</text>
+<text x="880.5" y="264" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="400" fill="#636c76" text-anchor="middle">awaiting acceptance</text>
+<path d="M963 247.0 L983 247.0" stroke="#b6bdc6" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+<text x="1067.5" y="202" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#5b43b5" text-anchor="middle" letter-spacing="1.2">you</text>
+<rect x="991" y="212" width="153" height="70" rx="10" fill="#f2effc" stroke="#bfb0ea"/>
+<text x="1067.5" y="242" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="middle">done</text>
+<text x="1067.5" y="264" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="400" fill="#636c76" text-anchor="middle">merged, sha recorded</text>
+<path d="M693.5 288 C693.5 340 506.5 340 506.5 290" stroke="#b6bdc6" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#a)"/>
+<rect x="565.8" y="316.0" width="68.4" height="22" rx="6" fill="#ffffff"/>
+<text x="600.0" y="331.0" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" fill="#636c76" text-anchor="middle">rejected</text>
+<path d="M506.5 288 C506.5 392 319.5 392 319.5 290" stroke="#b6bdc6" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#a)"/>
+<rect x="350.45" y="355.0" width="125.1" height="22" rx="6" fill="#ffffff"/>
+<text x="413.0" y="370.0" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" fill="#636c76" text-anchor="middle">the test is wrong</text>
+<text x="56" y="424" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" font-weight="600" fill="#636c76" text-anchor="start" letter-spacing="1.8">AND THE THREE RECORDS BEHIND IT</text>
+<rect x="56" y="446" width="344" height="104" rx="12" fill="#f6f7f9" stroke="#d8dce1"/>
+<text x="76" y="478" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="start">docs/agile/</text>
+<text x="76" y="502" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="13" font-weight="400" fill="#636c76" text-anchor="start">what we are doing</text>
+<text x="76" y="524" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" fill="#636c76" text-anchor="start" opacity="0.85">epics, tasks, bugs, a generated board</text>
+<text x="380" y="478" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#c2410c" text-anchor="end">agile.py lint</text>
+<rect x="428" y="446" width="344" height="104" rx="12" fill="#f6f7f9" stroke="#d8dce1"/>
+<text x="448" y="478" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="start">docs/knowledge/</text>
+<text x="448" y="502" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="13" font-weight="400" fill="#636c76" text-anchor="start">what we know</text>
+<text x="448" y="524" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" fill="#636c76" text-anchor="start" opacity="0.85">eight typed, cross-linked note kinds</text>
+<text x="752" y="478" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#c2410c" text-anchor="end">kb.py lint</text>
+<rect x="800" y="446" width="344" height="104" rx="12" fill="#f6f7f9" stroke="#d8dce1"/>
+<text x="820" y="478" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="15" font-weight="400" fill="#15181d" text-anchor="start">forge.json</text>
+<text x="820" y="502" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="13" font-weight="400" fill="#636c76" text-anchor="start">what this project is made of</text>
+<text x="820" y="524" font-family="ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="400" fill="#636c76" text-anchor="start" opacity="0.85">repos, scopes, agents, runnable checks</text>
+<text x="1124" y="478" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#c2410c" text-anchor="end">forge.py doctor</text>
+</svg>
