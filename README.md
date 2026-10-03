@@ -147,7 +147,8 @@ forge/
 │   ├── CLAUDE.harness.md.tmpl
 │   └── forge.example.*.json
 ├── docs/                  how the harness works and how to extend it
-└── tests/smoke.sh         installs into a throwaway repo and proves every gate fires
+├── tests/smoke.sh         installs into a throwaway repo and proves every gate fires
+└── LICENSE                MIT
 ```
 
 ## Requirements
@@ -167,3 +168,11 @@ Installs into a temporary repository, files a ticket and a note through the
 scripts, and asserts that each gate fires: the docs gate, the knowledge-base
 naming guard, the generated-index guard, the byte-stability of both indexes, and
 the one-working-tree rule.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+That covers everything under `template/` too, so the harness a project installs
+carries the same terms. Installed files get no licence header: they land in
+someone else's repository, and a per-file banner there would be noise.
