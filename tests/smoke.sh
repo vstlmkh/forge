@@ -158,6 +158,59 @@ hook() { printf '%s' "$2" | python3 ".claude/scripts/$1" >/dev/null 2>&1; echo $
 [ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/tasks/TASK-0009-new.md","content":"---\nid: TASK-0009\n---\n"}}')" = 2 ] \
   && ok "guard-kb denies a new ticket with no docs:" || bad "guard-kb allowed a ticket with no docs:"
 
+echo "== detection and --auto"
+FIX="$WORK/../forge-smoke-fixture-$$"
+rm -rf "$FIX"; mkdir -p "$FIX/apps/web" "$FIX/services/api"
+git -C "$FIX" init -q
+cat > "$FIX/apps/web/package.json" <<'EOT'
+{"name":"web","scripts":{"test":"jest","tsc":"tsc --noEmit","build":"next build"},
+ "dependencies":{"next":"16.0.0"},"devDependencies":{"typescript":"5.6.0"}}
+EOT
+cat > "$FIX/services/api/pyproject.toml" <<'EOT'
+[project]
+name = "api"
+dependencies = ["fastapi"]
+[dependency-groups]
+dev = ["pytest", "ruff"]
+EOT
+OUT="$("$FORGE/bin/forge" detect "$FIX" 2>&1)"
+printf '%s' "$OUT" | grep -q "scope web" && printf '%s' "$OUT" | grep -q "scope api"   && ok "detect finds both parts of a mixed monorepo"   || { bad "detect missed a scope"; printf '%s\n' "$OUT" | sed 's/^/       /'; }
+printf '%s' "$OUT" | grep -q "npm test" && printf '%s' "$OUT" | grep -q "pytest -q"   && ok "detect reads the real test commands" || bad "detect invented or missed a command"
+
+"$FORGE/bin/forge" init "$FIX" --auto --name Fixture >/dev/null 2>&1
+( cd "$FIX" && want 0 "a repo initialised with --auto passes doctor" -- \
+    python3 .claude/scripts/forge.py doctor )
+[ -f "$FIX/.claude/agents/web-engineer.md" ] && [ -f "$FIX/.claude/agents/api-engineer.md" ] \
+  && ok "--auto renders an agent per detected scope" || bad "--auto skipped an agent"
+
+echo "== submodule layout"
+SUB="$WORK/../forge-smoke-sub-$$"
+rm -rf "$SUB"; mkdir -p "$SUB/backend/app" "$SUB/frontend"
+git -C "$SUB" init -q
+printf '[submodule "backend"]\n\tpath = backend\n\turl = git@example.com:a/b.git\n' > "$SUB/.gitmodules"
+echo '{"name":"b","scripts":{"test":"phpunit"}}' > "$SUB/backend/app/composer.json"
+OUT="$("$FORGE/bin/forge" detect "$SUB" 2>&1)"
+printf '%s' "$OUT" | grep -q "super-repo with submodules" \
+  && ok "detect recognises a super-repo" || bad "detect missed the submodules"
+printf '%s' "$OUT" | grep -q "backend/app" \
+  && ok "detect finds an application nested inside a submodule" \
+  || bad "detect did not look inside the submodule"
+
+echo "== installer"
+INST="$WORK/../forge-smoke-install-$$"
+rm -rf "$INST"
+FORGE_REPO="$FORGE" FORGE_HOME="$INST/.forge" FORGE_BIN="$INST/bin" \
+  sh "$FORGE/install.sh" >/dev/null 2>&1
+[ -L "$INST/bin/forge" ] && ok "installer links a shim onto the bin dir" \
+  || bad "installer did not create the shim"
+[ "$("$INST/bin/forge" version 2>/dev/null)" = "$("$FORGE/bin/forge" version)" ] \
+  && ok "the shim runs, and finds template/ through the symlink" \
+  || bad "the shim could not run"
+FORGE_REPO="$FORGE" FORGE_HOME="$INST/.forge" FORGE_BIN="$INST/bin" \
+  sh "$FORGE/install.sh" >/dev/null 2>&1 \
+  && ok "re-running the installer updates in place" || bad "the installer is not re-runnable"
+rm -rf "$FIX" "$SUB" "$INST"
+
 echo
 echo "passed $PASS, failed $FAIL   (workdir: $WORK)"
 [ "$FAIL" = 0 ]

@@ -9,16 +9,45 @@ A reusable agent harness for software projects: a test-first development cycle,
 a Markdown tracker, a typed knowledge base, four role agents and the hooks that
 keep all of it honest — installable into any repository in one command.
 
+## Install
+
 ```bash
-git clone <this repo> ~/src/forge
-cd /path/to/your/project
-~/src/forge/bin/forge init
+gh repo clone vstlmkh/forge ~/.forge && ~/.forge/install.sh
 ```
 
-The interview writes `forge.json`, copies the harness into `.claude/`,
-scaffolds `docs/agile/` and `docs/knowledge/`, renders one engineer agent per
-scope, and adds a managed block to your `CLAUDE.md`. Nothing else in the project
-is touched.
+or, over plain https:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vstlmkh/forge/master/install.sh | sh
+```
+
+One git checkout in `~/.forge`, one `forge` shim in `~/.local/bin`, no
+packages, nothing compiled. Re-run the script any time to update, or run
+`forge self-update`. `FORGE_HOME`, `FORGE_BIN` and `FORGE_REF` override where it
+lands and which ref it tracks.
+
+## Use it in a project
+
+```bash
+cd /path/to/your/project
+forge detect        # what forge thinks this repository is made of
+forge init --auto   # install the harness from exactly that, asking nothing
+```
+
+`detect` reads `.gitmodules`, then looks for `package.json`, `pyproject.toml`,
+`composer.json`, `go.mod`, `Cargo.toml` and `pubspec.yaml` — including one level
+inside a submodule, where deployment repositories usually keep the application.
+Out of that come the repositories, the scopes, a stack label and the real test,
+lint, type and build commands the project already has. It guesses that those
+commands work; `forge doctor` and you decide whether they do.
+
+`forge init` without `--auto` asks instead — it still opens with what it
+detected, so the usual answer is "yes, that's right".
+
+Either way it writes `forge.json`, copies the harness into `.claude/`, scaffolds
+`docs/agile/` and `docs/knowledge/`, renders one engineer agent per scope, and
+adds a managed block to your `CLAUDE.md`. Nothing else in the project is
+touched.
 
 ## What you get
 
@@ -92,10 +121,13 @@ python3 .claude/scripts/forge.py doctor        # does the config match the repo?
 ## CLI
 
 ```
-forge init [TARGET]      install, interactively (or --preset monorepo|submodules)
+forge detect [TARGET]    print the shape forge infers, and change nothing
+forge init [TARGET]      install — interactively, or --auto, or --preset NAME
 forge agents [TARGET]    re-render the per-scope engineer agents from forge.json
 forge upgrade [TARGET]   refresh scripts, skills, commands and specs in place
 forge doctor [TARGET]    run the installed harness's self-check
+forge self-update        pull the newest forge into ~/.forge
+forge where              print where forge is installed
 ```
 
 `upgrade` never touches `forge.json` or a rendered agent (pass `--agents` to
@@ -106,7 +138,8 @@ re-render those too), and rewrites only the `<!-- forge:begin -->` block in
 
 ```
 forge/
-├── bin/forge              the installer
+├── install.sh             clones into ~/.forge and links the shim; re-run to update
+├── bin/forge              the CLI: detect, init, agents, upgrade, doctor
 ├── assets/banner.py       regenerates the two README banners
 ├── template/              the payload that gets copied into a project
 │   ├── .claude/           agents, skills, commands, scripts, settings
@@ -121,6 +154,8 @@ forge/
 
 Python 3.9+ and git. No third-party packages, at install time or afterwards —
 the hooks run on every turn, so the harness refuses to own a dependency tree.
+Updating forge never touches a project: a project picks up a new version when
+you run `forge upgrade` in it.
 
 ## Tests
 

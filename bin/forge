@@ -5,13 +5,17 @@
     forge agents [TARGET]      re-render the per-scope engineer agents from forge.json
     forge upgrade [TARGET]     refresh the scripts, skills, commands and specs in place
     forge doctor [TARGET]      run the installed harness's self-check
+    forge detect [TARGET]      print the shape forge infers, and change nothing
+    forge self-update          pull the newest forge into its own checkout
+    forge where                print where forge is installed
     forge version
 
-`init` is interactive unless you pass --preset. Everything it asks ends up in
-TARGET/forge.json, which is the single source of truth afterwards: scopes,
-repositories, owning agents and the Definition-of-Done matrix.
+`init` is interactive unless you pass --auto or --preset. Everything it asks
+ends up in TARGET/forge.json, which is the single source of truth afterwards:
+scopes, repositories, owning agents and the Definition-of-Done matrix.
 
 Flags
+    --auto                         infer the shape from the repository, ask nothing
     --preset monorepo|submodules   skip the interview, start from an example
     --name NAME                    project name (default: the directory name)
     --force                        overwrite files that already exist
@@ -25,7 +29,9 @@ import os
 import shutil
 import sys
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# realpath, not abspath: the usual installation is a symlink on PATH pointing
+# into ~/.forge, and template/ has to be found relative to the real file.
+HERE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 TEMPLATE = os.path.join(HERE, "template")
 VERSION = "1.0.0"
 
@@ -102,6 +108,282 @@ def write_json(path: str, data: dict) -> None:
 
 
 # --------------------------------------------------------------------------
+# detection - infer the project's shape so that init has something to propose
+# --------------------------------------------------------------------------
+
+# manifest -> (stack label, function returning check rows)
+def _read(path: str) -> str:
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def _npm_checks(d: str) -> tuple[str, list[dict]]:
+    try:
+        pkg = json.loads(_read(os.path.join(d, "package.json")) or "{}")
+    except json.JSONDecodeError:
+        pkg = {}
+    scripts = pkg.get("scripts") or {}
+    deps = {**(pkg.get("dependencies") or {}), **(pkg.get("devDependencies") or {})}
+    stack = ", ".join(n for n in ("next", "react", "vue", "svelte", "express", "nest",
+                                  "typescript", "vite") if n in deps) or "Node.js"
+    rows = []
+    for cid, title, names in (
+        ("tests", "Tests", ("test", "test:ci")),
+        ("types", "Types", ("tsc", "typecheck", "type-check")),
+        ("lint", "Lint", ("lint:errors", "lint")),
+        ("build", "Production build", ("build",)),
+    ):
+        hit = next((n for n in names if n in scripts), None)
+        if hit:
+            rows.append({"id": cid, "title": title, "command": f"npm run {hit}"
+                         if hit != "test" else "npm test", "available": True})
+    return stack, rows
+
+
+def _python_checks(d: str) -> tuple[str, list[dict]]:
+    text = _read(os.path.join(d, "pyproject.toml")) + _read(os.path.join(d, "requirements.txt"))
+    rows = []
+    if "pytest" in text or os.path.isdir(os.path.join(d, "tests")):
+        rows.append({"id": "tests", "title": "Tests", "command": "pytest -q", "available": True})
+    if "ruff" in text:
+        rows.append({"id": "lint", "title": "Lint", "command": "ruff check .", "available": True})
+    if "mypy" in text:
+        rows.append({"id": "types", "title": "Types", "command": "mypy .", "available": True})
+    stack = "Django" if "django" in text.lower() else \
+            "FastAPI" if "fastapi" in text.lower() else \
+            "Flask" if "flask" in text.lower() else "Python"
+    return stack, rows
+
+
+def _php_checks(d: str) -> tuple[str, list[dict]]:
+    try:
+        pkg = json.loads(_read(os.path.join(d, "composer.json")) or "{}")
+    except json.JSONDecodeError:
+        pkg = {}
+    scripts = pkg.get("scripts") or {}
+    deps = {**(pkg.get("require") or {}), **(pkg.get("require-dev") or {})}
+    rows = []
+    if "test" in scripts or os.path.isdir(os.path.join(d, "tests")):
+        rows.append({"id": "tests", "title": "Tests", "command": "composer test"
+                     if "test" in scripts else "./vendor/bin/phpunit", "available": True})
+    if any("pint" in k for k in deps):
+        rows.append({"id": "style", "title": "Style", "command": "./vendor/bin/pint --test",
+                     "available": True})
+    if any("phpstan" in k or "larastan" in k for k in deps):
+        rows.append({"id": "stan", "title": "Static analysis",
+                     "command": "./vendor/bin/phpstan analyse", "available": True})
+    stack = "Laravel" if any("laravel" in k for k in deps) else \
+            "Symfony" if any("symfony" in k for k in deps) else "PHP"
+    return stack, rows
+
+
+def _go_checks(d: str) -> tuple[str, list[dict]]:
+    return "Go", [
+        {"id": "tests", "title": "Tests", "command": "go test ./...", "available": True},
+        {"id": "vet", "title": "Vet", "command": "go vet ./...", "available": True},
+    ]
+
+
+def _rust_checks(d: str) -> tuple[str, list[dict]]:
+    return "Rust", [
+        {"id": "tests", "title": "Tests", "command": "cargo test", "available": True},
+        {"id": "lint", "title": "Lint", "command": "cargo clippy -- -D warnings", "available": True},
+    ]
+
+
+def _dart_checks(d: str) -> tuple[str, list[dict]]:
+    flutter = "flutter" in _read(os.path.join(d, "pubspec.yaml"))
+    return ("Flutter" if flutter else "Dart"), [
+        {"id": "tests", "title": "Tests", "command": "flutter test" if flutter else "dart test",
+         "available": True},
+        {"id": "lint", "title": "Analyze",
+         "command": "flutter analyze" if flutter else "dart analyze", "available": True},
+    ]
+
+
+MANIFESTS = [
+    ("package.json", _npm_checks),
+    ("pyproject.toml", _python_checks),
+    ("requirements.txt", _python_checks),
+    ("composer.json", _php_checks),
+    ("go.mod", _go_checks),
+    ("Cargo.toml", _rust_checks),
+    ("pubspec.yaml", _dart_checks),
+]
+
+# where a monorepo usually hides its parts; "." is tried first
+SEARCH_DIRS = [".", "apps", "services", "packages", "src", "backend", "frontend", "api", "web"]
+SKIP_DIRS = {"node_modules", "vendor", ".git", "dist", "build", ".next", "venv", ".venv"}
+
+
+def _branch_of(path: str) -> str:
+    import subprocess
+    try:
+        res = subprocess.run(["git", "-C", path, "rev-parse", "--abbrev-ref", "HEAD"],
+                             capture_output=True, text=True, timeout=10)
+        name = res.stdout.strip()
+        return name if name and name != "HEAD" else "main"
+    except (OSError, subprocess.SubprocessError):
+        return "main"
+
+
+def _submodules(target: str) -> list[tuple[str, str]]:
+    """[(name, path)] from .gitmodules, in declaration order."""
+    text = _read(os.path.join(target, ".gitmodules"))
+    out, name = [], None
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("[submodule"):
+            name = line.split('"')[1] if '"' in line else None
+        elif line.startswith("path") and "=" in line:
+            path = line.split("=", 1)[1].strip()
+            out.append((os.path.basename(name or path), path))
+    return out
+
+
+def _manifest_in(d: str):
+    for manifest, fn in MANIFESTS:
+        if os.path.isfile(os.path.join(d, manifest)):
+            return manifest, fn
+    return None, None
+
+
+def _candidate_dirs(target: str) -> list[str]:
+    """Directories that look like a deployable part, as paths relative to target."""
+    found = []
+    for rel in SEARCH_DIRS:
+        d = target if rel == "." else os.path.join(target, rel)
+        if not os.path.isdir(d):
+            continue
+        if _manifest_in(d)[0]:
+            found.append("." if rel == "." else rel)
+            continue
+        if rel == ".":
+            continue
+        for name in sorted(os.listdir(d)):
+            if name.startswith(".") or name in SKIP_DIRS:
+                continue
+            sub = os.path.join(d, name)
+            if os.path.isdir(sub) and _manifest_in(sub)[0]:
+                found.append(os.path.join(rel, name))
+    # "." only counts when nothing more specific was found
+    specific = [f for f in found if f != "."]
+    return specific or found
+
+
+def detect(target: str) -> dict:
+    """Infer repositories, scopes and checks. Everything here is a proposal:
+    `forge doctor` and the user decide whether it is true."""
+    subs = _submodules(target)
+    repos: dict = {}
+    scopes: dict = {}
+    checks: dict = {}
+
+    if subs:
+        repos["harness"] = {"path": ".", "branch": _branch_of(target),
+                            "submodule": False, "role": "harness"}
+        parts = [(name, path, os.path.join(target, path)) for name, path in subs]
+    else:
+        repos["root"] = {"path": ".", "branch": _branch_of(target), "submodule": False}
+        parts = []
+        for rel in _candidate_dirs(target):
+            name = "app" if rel == "." else os.path.basename(rel)
+            parts.append((name, rel, os.path.join(target, rel)))
+
+    for name, rel, abs_dir in parts:
+        scope = name.replace("_", "-").lower()
+        # a submodule root may hold the manifest one level down (a deployment repo)
+        search = abs_dir
+        if not _manifest_in(abs_dir)[0]:
+            for inner in ("app", "src", "server", "client"):
+                if _manifest_in(os.path.join(abs_dir, inner))[0]:
+                    search = os.path.join(abs_dir, inner)
+                    break
+        manifest, fn = _manifest_in(search)
+        stack, rows = fn(search) if fn else ("", [])
+        workdir = os.path.relpath(search, target)
+        if subs:
+            repos[scope] = {"path": rel, "branch": _branch_of(abs_dir), "submodule": True}
+            repo_key = scope
+        else:
+            repo_key = "root"
+        for row in rows:
+            if workdir != ".":
+                row["cwd"] = workdir
+        scopes[scope] = {"repo": repo_key, "agent": f"{scope}-engineer", "kb_scope": scope,
+                         "stack": stack, "workdir": workdir, "code": True}
+        checks[scope] = rows
+
+    return {"repos": repos, "scopes": scopes, "checks": checks,
+            "submodules": bool(subs)}
+
+
+def assemble(project: str, repos: dict, scopes: dict, checks: dict,
+             forbidden: list[str], never: list[str]) -> dict:
+    """Add the two non-code scopes every project needs, and the defaults."""
+    code_agents = sorted({a for s in scopes.values()
+                          for a in ([s["agent"]] if isinstance(s.get("agent"), str)
+                                    else s.get("agent") or [])})
+    scopes = dict(scopes)
+    scopes["infra"] = {"repo": None, "agent": code_agents or ["pm"], "kb_scope": "shared",
+                       "code": False}
+    scopes["docs"] = {"repo": None, "agent": (code_agents or []) + ["pm"],
+                      "kb_scope": "shared", "code": False}
+    checks = dict(checks)
+    checks["infra"] = [{"id": "tracker", "title": "Tracker integrity",
+                        "command": "python3 .claude/scripts/agile.py lint", "available": True}]
+    checks["docs"] = [
+        {"id": "tracker", "title": "Tracker integrity",
+         "command": "python3 .claude/scripts/agile.py lint", "available": True},
+        {"id": "kb", "title": "Knowledge-base integrity",
+         "command": "python3 .claude/scripts/kb.py lint", "available": True},
+    ]
+    return {
+        "forge_version": VERSION,
+        "project": {"name": project, "description": ""},
+        "paths": {"tracker": "docs/agile", "kb": "docs/knowledge"},
+        "repos": repos,
+        "scopes": scopes,
+        "checks": checks,
+        "kb": {
+            "scopes": [s["kb_scope"] for s in scopes.values() if s.get("code")] + ["shared"],
+            "shared_scope": "shared",
+            "locked_types": {"api-contract": ["shared"]},
+            "forbidden_dirs": forbidden,
+        },
+        "git": {
+            "commit_style": "conventional-third-person",
+            "require_refs_trailer": True,
+            "pull_requests": True,
+            "branch_prefixes": ["feat", "fix", "chore", "style", "refactor",
+                                "docs", "test", "perf"],
+            "never_commit": never,
+        },
+        "policy": {"test_first": True, "require_docs": True, "stale_claim_hours": 24},
+    }
+
+
+DEFAULT_NEVER = [".env", "node_modules/", "vendor/", "dist/", "build/", ".idea/"]
+
+
+def describe(found: dict) -> list[str]:
+    lines = []
+    shape = "super-repo with submodules" if found["submodules"] else "single repository"
+    lines.append(f"  layout: {shape}")
+    for name, s in found["scopes"].items():
+        rows = found["checks"].get(name) or []
+        cmds = ", ".join(r["command"] for r in rows) or "no checks found"
+        lines.append(f"  scope {name}: {s['stack'] or 'unknown stack'} in {s['workdir']} "
+                     f"-> {cmds}")
+    if not found["scopes"]:
+        lines.append("  no scopes found - nothing here looks like a buildable part")
+    return lines
+
+
+# --------------------------------------------------------------------------
 # the interview
 # --------------------------------------------------------------------------
 
@@ -112,7 +394,20 @@ def interview(target: str, name: str) -> dict:
     say("")
 
     project = ask("Project name", name)
-    layout = ask("Layout - (1) one repository, (2) super-repo with submodules", "1")
+
+    found = detect(target)
+    if found["scopes"]:
+        say("")
+        say("This is what the repository looks like from here:")
+        for line in describe(found):
+            say(line)
+        say("")
+        if ask_yes("Use that, and skip the rest of the questions?", True):
+            return finish(project, found["repos"], found["scopes"], found["checks"])
+        say("")
+
+    layout = ask("Layout - (1) one repository, (2) super-repo with submodules",
+                 "2" if found["submodules"] else "1")
     submodules = layout.strip().startswith("2")
 
     repos: dict = {}
@@ -192,52 +487,18 @@ def interview(target: str, name: str) -> dict:
             say("  (no checks declared - `forge doctor` will flag this)")
         checks[scope] = rows
 
-    all_agents = sorted({s["agent"] for s in scopes.values()})
-    scopes["infra"] = {"repo": None, "agent": all_agents, "kb_scope": "shared", "code": False}
-    scopes["docs"] = {"repo": None, "agent": all_agents + ["pm"], "kb_scope": "shared",
-                      "code": False}
-    checks["infra"] = [
-        {"id": "tracker", "title": "Tracker integrity",
-         "command": "python3 .claude/scripts/agile.py lint", "available": True},
-    ]
-    checks["docs"] = [
-        {"id": "tracker", "title": "Tracker integrity",
-         "command": "python3 .claude/scripts/agile.py lint", "available": True},
-        {"id": "kb", "title": "Knowledge-base integrity",
-         "command": "python3 .claude/scripts/kb.py lint", "available": True},
-    ]
+    return finish(project, repos, scopes, checks)
 
+
+def finish(project: str, repos: dict, scopes: dict, checks: dict) -> dict:
+    """The last two questions, asked the same way however the shape was arrived at."""
     say("")
     forbidden = []
     if ask_yes("Disown docs/wiki/ (deny writes there, in favour of docs/knowledge/)?", False):
         forbidden.append("docs/wiki")
-
-    never = ask("Never-commit paths, comma separated",
-                ".env, node_modules/, vendor/, dist/, build/, .idea/")
-
-    return {
-        "forge_version": VERSION,
-        "project": {"name": project, "description": ""},
-        "paths": {"tracker": "docs/agile", "kb": "docs/knowledge"},
-        "repos": repos,
-        "scopes": scopes,
-        "checks": checks,
-        "kb": {
-            "scopes": [s["kb_scope"] for s in scopes.values() if s.get("code")] + ["shared"],
-            "shared_scope": "shared",
-            "locked_types": {"api-contract": ["shared"]},
-            "forbidden_dirs": forbidden,
-        },
-        "git": {
-            "commit_style": "conventional-third-person",
-            "require_refs_trailer": True,
-            "pull_requests": True,
-            "branch_prefixes": ["feat", "fix", "chore", "style", "refactor",
-                                "docs", "test", "perf"],
-            "never_commit": [p.strip() for p in never.split(",") if p.strip()],
-        },
-        "policy": {"test_first": True, "require_docs": True, "stale_claim_hours": 24},
-    }
+    never = ask("Never-commit paths, comma separated", ", ".join(DEFAULT_NEVER))
+    return assemble(project, repos, scopes, checks, forbidden,
+                    [p.strip() for p in never.split(",") if p.strip()])
 
 
 # --------------------------------------------------------------------------
@@ -418,6 +679,20 @@ def cmd_init(argv: list[str]) -> int:
     if os.path.exists(cfg_path) and not force:
         say(f"forge.json already exists in {target} - keeping it.")
         cfg = read_json(cfg_path)
+    elif "--auto" in argv:
+        found = detect(target)
+        if not found["scopes"]:
+            die("nothing here looks like a buildable part - run `forge init` and "
+                "describe the project yourself, or pass --preset")
+        cfg = assemble(name, found["repos"], found["scopes"], found["checks"],
+                       [], DEFAULT_NEVER)
+        write_json(cfg_path, cfg)
+        say("inferred the project's shape:")
+        for line in describe(found):
+            say(line)
+        say("")
+        say("wrote forge.json - read it before trusting it, especially the `available`")
+        say("flags: forge guessed that each command runs, it did not run them.")
     elif preset:
         example = os.path.join(TEMPLATE, f"forge.example.{preset}.json")
         if not os.path.exists(example):
@@ -491,6 +766,41 @@ def cmd_doctor(argv: list[str]) -> int:
     return 0
 
 
+def cmd_detect(argv: list[str]) -> int:
+    target = os.path.abspath(argv[0]) if argv and not argv[0].startswith("-") else os.getcwd()
+    found = detect(target)
+    say(f"{target}")
+    for line in describe(found):
+        say(line)
+    if not found["scopes"]:
+        return 2
+    say("")
+    say("`forge init --auto` would write exactly this. Nothing was changed.")
+    return 0
+
+
+def cmd_self_update(argv: list[str]) -> int:
+    import subprocess
+    if not os.path.isdir(os.path.join(HERE, ".git")):
+        die(f"{HERE} is not a git checkout - update it however you installed it")
+    for cmd in (["git", "-C", HERE, "fetch", "--quiet", "origin"],
+                ["git", "-C", HERE, "pull", "--ff-only", "--quiet"]):
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        if res.returncode != 0:
+            die(f"{' '.join(cmd)}: {res.stderr.strip() or res.stdout.strip()}")
+    head = subprocess.run(["git", "-C", HERE, "log", "-1", "--oneline"],
+                          capture_output=True, text=True).stdout.strip()
+    say(f"forge {VERSION} at {HERE}")
+    say(f"  {head}")
+    say("Projects pick this up with `forge upgrade` in each of them.")
+    return 0
+
+
+def cmd_where(argv: list[str]) -> int:
+    say(HERE)
+    return 0
+
+
 def main(argv: list[str]) -> int:
     args = argv[1:]
     if not args or args[0] in ("-h", "--help", "help"):
@@ -505,6 +815,12 @@ def main(argv: list[str]) -> int:
         return cmd_upgrade(rest)
     if cmd == "doctor":
         return cmd_doctor(rest)
+    if cmd == "detect":
+        return cmd_detect(rest)
+    if cmd in ("self-update", "selfupdate", "update"):
+        return cmd_self_update(rest)
+    if cmd == "where":
+        return cmd_where(rest)
     if cmd in ("version", "--version"):
         print(VERSION)
         return 0

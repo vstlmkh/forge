@@ -7,11 +7,23 @@ run `agile.py` or `kb.py` against this repo, and do not install the harness into
 it.
 
 ```
-bin/forge                 the installer and renderer
+install.sh                clones into ~/.forge and links the shim; re-run to update
+bin/forge                 the CLI: detection, install, render, upgrade
 template/                 the payload copied into a project — the actual product
+assets/banner.py          regenerates the two README banners
 docs/                     how the harness works, and how to extend it
 tests/smoke.sh            installs into a throwaway repo and proves every gate fires
 ```
+
+`bin/forge` is reached through a symlink on `PATH`, so it resolves its own
+location with `realpath`, not `abspath` — `template/` has to be found next to
+the real file, not next to the shim.
+
+Detection (`forge detect`, and the opening of `forge init`) proposes; it never
+asserts. A check it infers is written `"available": true` because the project
+*has* that script, not because forge ran it — the text it prints says so, and
+`forge doctor` is where that gets tested. Adding a stack means one function in
+`bin/forge` and one entry in `MANIFESTS`.
 
 ## The one rule that keeps the harness reusable
 
