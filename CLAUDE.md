@@ -83,6 +83,16 @@ visible text with a link rather than a hidden mark, and keep
 forge to generate. `cfg.credit()` in the payload and `credit()` in `bin/forge`
 are the only two places that produce the line.
 
+## Two distribution channels, one CLI
+
+`install.sh` (a git checkout in `~/.forge`) and the npm package
+(`@vstlmkh/forge`, where `bin/forge.js` shells out to `bin/forge`) ship the same
+files. Two things must therefore stay true: `VERSION` in `bin/forge` equals
+`version` in `package.json` — the smoke test checks it — and anything a new
+feature needs at runtime belongs in the `files` list of `package.json`, or it
+will work from a checkout and be missing from the package. `forge self-update`
+branches on which channel it is running from; keep both branches correct.
+
 ## Compatibility
 
 Stdlib-only Python 3.9+. The hooks run on every turn in every installed project,

@@ -1,0 +1,49 @@
+{
+  "name": "@vstlmkh/forge",
+  "version": "1.0.0",
+  "description": "A reusable agent harness for any repository: test-first ticket cycle, Markdown tracker, typed knowledge base, role agents and the hooks that keep them honest.",
+  "keywords": [
+    "agent",
+    "ai-agents",
+    "claude",
+    "claude-code",
+    "harness",
+    "scaffolding",
+    "tracker",
+    "knowledge-base",
+    "developer-tools"
+  ],
+  "homepage": "https://github.com/vstlmkh/forge#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vstlmkh/forge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vstlmkh/forge/issues"
+  },
+  "license": "MIT",
+  "author": "Vladislav Stelmakh",
+  "type": "commonjs",
+  "bin": {
+    "forge": "bin/forge.js"
+  },
+  "files": [
+    "bin/",
+    "template/",
+    "assets/",
+    "docs/",
+    "install.sh",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bash tests/smoke.sh",
+    "prepublishOnly": "bash tests/smoke.sh"
+  }
+}

@@ -13,6 +13,7 @@ PASS=0
 FAIL=0
 
 ok()   { PASS=$((PASS+1)); printf '  ok   %s\n' "$1"; }
+skip() { printf '  SKIP %s\n' "$1"; }   # never a pass - the harness's own rule
 bad()  { FAIL=$((FAIL+1)); printf '  FAIL %s\n' "$1"; }
 want() { # want <expected-rc> <label> -- <command...>
   local exp="$1" label="$2"; shift 3
@@ -236,6 +237,46 @@ FORGE_REPO="$FORGE" FORGE_HOME="$INST/.forge" FORGE_BIN="$INST/bin" \
   sh "$FORGE/install.sh" >/dev/null 2>&1 \
   && ok "re-running the installer updates in place" || bad "the installer is not re-runnable"
 rm -rf "$FIX" "$SUB" "$INST"
+
+echo "== npm packaging"
+PKG_VERSION="$(node -p "require('$FORGE/package.json').version" 2>/dev/null || true)"
+if [ -n "$PKG_VERSION" ]; then
+  [ "$PKG_VERSION" = "$("$FORGE/bin/forge" version)" ] \
+    && ok "package.json and the CLI agree on the version" \
+    || bad "package.json says $PKG_VERSION, the CLI says $("$FORGE/bin/forge" version)"
+else
+  skip "version sync (node is not installed)"
+fi
+
+if [ -n "${npm_lifecycle_event:-}" ]; then
+  # we are already inside `npm publish`/`npm test`; packing again from here
+  # re-enters npm in the same directory and fails on its own lock
+  skip "npm packaging (already running inside npm $npm_lifecycle_event)"
+elif command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+  NPM="$WORK/../forge-smoke-npm-$$"
+  rm -rf "$NPM"; mkdir -p "$NPM/proj/apps/web"
+  TGZ="$(cd "$FORGE" && npm pack --silent --pack-destination "$NPM" 2>/dev/null | tail -1)"
+  if [ -n "$TGZ" ] && npm install --silent --prefix "$NPM/install" "$NPM/$TGZ" >/dev/null 2>&1; then
+    SHIM="$NPM/install/node_modules/.bin/forge"
+    [ -x "$SHIM" ] && ok "npm installs a forge shim" || bad "npm did not install the shim"
+    [ "$("$SHIM" version 2>/dev/null)" = "$PKG_VERSION" ] \
+      && ok "the npm shim runs the Python CLI" || bad "the npm shim did not run"
+    git -C "$NPM/proj" init -q
+    echo '{"name":"w","scripts":{"test":"jest"}}' > "$NPM/proj/apps/web/package.json"
+    ( cd "$NPM/proj" && "$SHIM" init . --auto --name NpmTest >/dev/null 2>&1 \
+      && python3 .claude/scripts/forge.py doctor >/dev/null 2>&1 ) \
+      && ok "a project installed from the npm package passes doctor" \
+      || bad "the packaged harness did not install cleanly"
+    "$SHIM" self-update 2>&1 | grep -q "npm" \
+      && ok "self-update tells an npm install to use npm" \
+      || bad "self-update tried to git-pull an npm install"
+  else
+    bad "npm pack/install failed"
+  fi
+  rm -rf "$NPM"
+else
+  skip "npm packaging (node or npm is not installed)"
+fi
 
 echo
 echo "passed $PASS, failed $FAIL   (workdir: $WORK)"

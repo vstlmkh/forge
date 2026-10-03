@@ -12,6 +12,17 @@ keep all of it honest — installable into any repository in one command.
 ## Install
 
 ```bash
+npx @vstlmkh/forge init --auto      # no install at all
+npm install -g @vstlmkh/forge       # or keep `forge` on your PATH
+```
+
+The npm package is a shim: the CLI itself is Python 3.9+ with no dependencies,
+exactly like the harness it installs. Node 16+ is only there to carry it.
+
+Prefer no npm in the loop? The shell installer puts one git checkout in
+`~/.forge` and one `forge` shim in `~/.local/bin`:
+
+```bash
 gh api repos/vstlmkh/forge/contents/install.sh -H "Accept: application/vnd.github.raw" | sh
 ```
 
@@ -31,9 +42,9 @@ your token. Once the repository is public, the short form works too:
 curl -fsSL https://raw.githubusercontent.com/vstlmkh/forge/master/install.sh | sh
 ```
 
-One git checkout in `~/.forge`, one `forge` shim in `~/.local/bin`, no packages,
-nothing compiled. Re-run the installer any time to update, or run
-`forge self-update`. `FORGE_HOME`, `FORGE_BIN`, `FORGE_REF` and `FORGE_REPO`
+Re-run the installer any time to update, or run `forge self-update` — which
+knows whether it is looking at a git checkout or an npm install and says the
+right thing for each. `FORGE_HOME`, `FORGE_BIN`, `FORGE_REF` and `FORGE_REPO`
 override where it lands, which ref it tracks and where it clones from.
 
 **On a machine with several GitHub accounts**, `gh repo clone` and
@@ -50,6 +61,9 @@ cd /path/to/your/project
 forge detect        # what forge thinks this repository is made of
 forge init --auto   # install the harness from exactly that, asking nothing
 ```
+
+Every command works through `npx @vstlmkh/forge …` just as well, if you would
+rather not install anything.
 
 `detect` reads `.gitmodules`, then looks for `package.json`, `pyproject.toml`,
 `composer.json`, `go.mod`, `Cargo.toml` and `pubspec.yaml` — including one level
@@ -156,7 +170,9 @@ re-render those too), and rewrites only the `<!-- forge:begin -->` block in
 ```
 forge/
 ├── install.sh             clones into ~/.forge and links the shim; re-run to update
+├── package.json           the npm package: @vstlmkh/forge
 ├── bin/forge              the CLI: detect, init, agents, upgrade, doctor
+├── bin/forge.js           the npm shim that runs it
 ├── assets/banner.py       regenerates the two README banners
 ├── template/              the payload that gets copied into a project
 │   ├── .claude/           agents, skills, commands, scripts, settings
@@ -170,7 +186,9 @@ forge/
 
 ## Requirements
 
-Python 3.9+ and git. No third-party packages, at install time or afterwards —
+Python 3.9+ and git — plus Node 16+ only if you install through npm, which uses
+it for nothing but the shim. No third-party packages, at install time or
+afterwards —
 the hooks run on every turn, so the harness refuses to own a dependency tree.
 Updating forge never touches a project: a project picks up a new version when
 you run `forge upgrade` in it.

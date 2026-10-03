@@ -810,6 +810,18 @@ def cmd_detect(argv: list[str]) -> int:
 def cmd_self_update(argv: list[str]) -> int:
     import subprocess
     if not os.path.isdir(os.path.join(HERE, ".git")):
+        # an npm installation has no history to pull; npm owns the version
+        if os.path.exists(os.path.join(HERE, "package.json")):
+            try:
+                with open(os.path.join(HERE, "package.json"), encoding="utf-8") as fh:
+                    pkg = json.load(fh).get("name", "@vstlmkh/forge")
+            except (OSError, json.JSONDecodeError):
+                pkg = "@vstlmkh/forge"
+            say(f"forge {VERSION} was installed from npm ({HERE})")
+            say(f"  npm install -g {pkg}@latest      # if you installed it globally")
+            say(f"  npx {pkg}@latest <command>       # or just always run the latest")
+            say("Projects pick a new version up with `forge upgrade` in each of them.")
+            return 0
         die(f"{HERE} is not a git checkout - update it however you installed it")
     for cmd in (["git", "-C", HERE, "fetch", "--quiet", "origin"],
                 ["git", "-C", HERE, "pull", "--ff-only", "--quiet"]):
