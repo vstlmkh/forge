@@ -98,13 +98,15 @@ want 0 "next-id advances" -- python3 .claude/scripts/agile.py next-id task
   && ok "next-id is TASK-0002" || bad "next-id did not advance"
 
 echo "== the docs gate"
-python3 - <<'PY'
-import re
+# a claim made now, not a literal date - a hardcoded one ages past
+# stale_claim_hours and turns this fixture into a time bomb
+NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)" python3 - <<'PY'
+import os
 p = "docs/agile/tasks/TASK-0001-first-task.md"
 s = open(p).read().replace("status: todo", "status: review")
 s = s.replace("branch: null", "branch: feat/health").replace("pr: null", "pr: https://example.com/pr/1")
 s = s.replace("assignee: null", "assignee: qa").replace(
-    "claimed_at: null", "claimed_at: 2026-10-03T10:00:00Z")
+    "claimed_at: null", "claimed_at: " + os.environ["NOW"])
 open(p, "w").write(s)
 PY
 OUT="$(python3 .claude/scripts/agile.py lint 2>&1)"; RC=$?
