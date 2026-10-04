@@ -1,0 +1,28 @@
+name: Docs
+description: The README, docs/ or anything under template/docs/ is wrong, missing or contradicts the scripts.
+labels: ["documentation"]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      placeholder: README.md § Install, template/docs/agile/SCHEMA.md §6 …
+    validations:
+      required: true
+
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What it says, and what is actually true
+      description: >-
+        If prose and a script disagree, the script wins — so say which script
+        and what it does. That drift is the bug, not the wording.
+    validations:
+      required: true
+
+  - type: textarea
+    id: fix
+    attributes:
+      label: Suggested wording
+    validations:
+      required: false

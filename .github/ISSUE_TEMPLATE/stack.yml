@@ -1,0 +1,64 @@
+name: Stack support
+description: forge detect does not recognise a language, package manager or layout it should.
+labels: ["detection"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Adding a stack is two edits in `bin/forge` — one `_<lang>_checks()`
+        function and one `MANIFESTS` entry — plus an assertion in
+        `tests/smoke.sh`. See
+        [CONTRIBUTING.md](https://github.com/vstlmkh/forge/blob/master/CONTRIBUTING.md#adding-a-stack);
+        PRs welcome, and this issue is a fine place to agree the commands first.
+
+  - type: input
+    id: stack
+    attributes:
+      label: Stack
+      placeholder: Elixir / Mix, Ruby / Bundler, .NET / dotnet …
+    validations:
+      required: true
+
+  - type: input
+    id: manifest
+    attributes:
+      label: Manifest file forge should key off
+      placeholder: mix.exs, Gemfile, *.csproj …
+    validations:
+      required: true
+
+  - type: textarea
+    id: commands
+    attributes:
+      label: The real commands
+      description: >-
+        What a project with that manifest actually runs, and how the manifest
+        tells you — forge reads the manifest, it never executes anything to find
+        out.
+      value: |
+        tests:
+        lint:
+        types:
+        build:
+
+        How to tell from the manifest:
+    validations:
+      required: true
+
+  - type: textarea
+    id: layout
+    attributes:
+      label: Anything unusual about the layout
+      description: >-
+        Workspaces, a nested application directory, a manifest that commonly
+        lives one level inside a submodule — the cases detection gets wrong.
+    validations:
+      required: false
+
+  - type: textarea
+    id: detect
+    attributes:
+      label: What forge detect currently says
+      render: shell
+    validations:
+      required: false

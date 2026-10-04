@@ -189,6 +189,7 @@ forge/
 │   └── forge.example.*.json
 ├── docs/                  how the harness works and how to extend it
 ├── tests/smoke.sh         installs into a throwaway repo and proves every gate fires
+├── CONTRIBUTING.md        how to file an issue and how to change forge itself
 └── LICENSE                MIT
 ```
 
@@ -236,6 +237,31 @@ Turn it off entirely with `forge init --no-attribution`, or later:
 ```bash
 python3 .claude/scripts/forge.py credit   # what this project signs with, if anything
 ```
+
+## Contributing
+
+Issues and pull requests are welcome —
+[CONTRIBUTING.md](CONTRIBUTING.md) is the whole of it. The short version:
+
+- **a bug** is `forge where`, `forge version`, `forge detect .` and the shortest
+  reproduction that still fails — in a throwaway repository, never a paste of a
+  private one;
+- **a stack forge does not recognise** is the cheapest contribution there is:
+  one `_<lang>_checks()` function and one `MANIFESTS` entry in `bin/forge`,
+  plus an assertion in `tests/smoke.sh`;
+- **a new rule** has to name the failure it prevents, because every rule under
+  `template/` is one an agent obeys in somebody else's repository forever;
+- **nothing in `template/` may name a project, a stack, a branch, a scope or a
+  command** — that is what keeps the payload identical everywhere and
+  `forge upgrade` safe;
+- **`tests/smoke.sh` has to pass**, and new behaviour needs a new assertion in
+  it. A gate nobody tests is a gate that silently stops firing.
+
+Before asking for a feature, check whether it is already a
+[`forge.json` edit](docs/customizing.md) — most of them are. If it genuinely
+cannot be expressed there, that is the feature request worth filing.
+
+Security issues go to <uladzislau.stelmakh@mobyrix.com>, not to the tracker.
 
 ## License
 

@@ -1,0 +1,15 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Customizing forge in your own project
+    url: https://github.com/vstlmkh/forge/blob/master/docs/customizing.md
+    about: >-
+      A scope, a stack, a check command, a policy toggle, moving the tracker —
+      that is forge.json in your project, not a change to forge.
+  - name: Security vulnerability
+    url: mailto:uladzislau.stelmakh@mobyrix.com
+    about: >-
+      A hook that executes attacker-controlled input, a guard that can be
+      bypassed into a write outside the project — mail it, never a public issue.
+  - name: Contributing guide
+    url: https://github.com/vstlmkh/forge/blob/master/CONTRIBUTING.md
+    about: What has to change together, the one rule, how to run the smoke test.

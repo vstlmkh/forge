@@ -1,0 +1,64 @@
+name: Feature or change
+description: The harness should do something it does not, or a rule should be different.
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Which layer
+      description: >-
+        These have different bars. A scope, stack label, check command or policy
+        toggle is `forge.json` in your project — see
+        [docs/customizing.md](https://github.com/vstlmkh/forge/blob/master/docs/customizing.md).
+        If `forge.json` genuinely cannot express it, pick the first option and
+        say so in those words.
+      options:
+        - forge.json cannot express something it should
+        - the payload (a skill, hook, tracker field, knowledge-base type)
+        - the CLI (detection, rendering, upgrade, self-update)
+        - docs
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What goes wrong today, concretely, in a real project. Not the solution
+        yet.
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure
+    attributes:
+      label: The failure this prevents
+      description: >-
+        Every rule under `template/` is a rule some agent obeys in somebody
+        else's repository forever. A rule with no named failure is one the next
+        agent optimises away, so name it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: >-
+        Where it would live, and what it would look like. Keep it stdlib-only
+        Python 3.9+, and remember nothing under `template/` may name a project,
+        a stack, a branch, a scope or a command.
+    validations:
+      required: false
+
+  - type: textarea
+    id: compat
+    attributes:
+      label: Effect on existing installations
+      description: >-
+        Would a project that already has the harness need anything beyond
+        `forge upgrade`? A renamed field or a moved path has to be handled by
+        `upgrade` or reported by `doctor`.
+    validations:
+      required: false

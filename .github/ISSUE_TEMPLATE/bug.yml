@@ -1,0 +1,105 @@
+name: Bug
+description: A command does the wrong thing — detect, init, upgrade, doctor, or a hook in an installed project.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        forge gets installed into other people's repositories. **Do not paste
+        client code, private paths or credentials** — reduce the problem to a
+        throwaway `git init` directory wherever you can.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what it did, and what you expected instead.
+      placeholder: |
+        $ forge init --auto
+        … output …
+
+        Expected: one scope per submodule. Got: one scope for the whole repo.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: >-
+        The shortest sequence that shows it. A scratch repository beats a
+        description of a private one.
+      placeholder: |
+        mkdir /tmp/scratch && cd /tmp/scratch && git init
+        printf '{"name":"x"}' > package.json
+        forge detect .
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: channel
+    attributes:
+      label: How forge is installed
+      description: The two channels ship the same files but resolve paths differently.
+      options:
+        - git checkout in ~/.forge (install.sh)
+        - npm install -g @vstlmkh/forge
+        - npx @vstlmkh/forge
+        - not sure — `forge where` says
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Paste the output as-is.
+      value: |
+        $ forge where
+
+        $ forge version
+
+        $ python3 --version
+
+        OS:
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: detect
+    attributes:
+      label: forge detect
+      description: >-
+        What forge infers about the project in question. Redact paths if you
+        must, but keep the shape.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: If the bug is inside an installed project
+      description: >-
+        Output of the self-checks. Most "the harness is wrong" reports are a
+        disagreement between `forge.json` and the repository, which is what
+        `doctor` exists to name.
+      value: |
+        $ python3 .claude/scripts/forge.py doctor
+
+        $ python3 .claude/scripts/agile.py lint
+
+        $ python3 .claude/scripts/kb.py lint
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: config
+    attributes:
+      label: forge.json (redacted)
+      render: json
+    validations:
+      required: false
