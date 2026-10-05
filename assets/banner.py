@@ -9,21 +9,32 @@ theme switch it honours; CSS inside an SVG served as an `<img>` is not.
 Everything is written as presentation attributes rather than a stylesheet,
 since GitHub's SVG sanitiser is free to drop `<style>`.
 
-The picture is the cycle itself, not decoration: the six states a ticket
-passes through, who holds each one, the two ways it comes back, and the three
-records that make the harness work.
+The picture is the cycle itself, not decoration: the seven states a ticket
+passes through, the six gates that sit on them, who holds each one, the three
+ways it comes back, and the three records that make the harness work.
 """
 
 import os
+import sys
 
-W, H = 1200, 580
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import logo  # noqa: E402  - the mark's geometry lives in exactly one file
+
+W, H = 1280, 620
 SANS = "ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace"
+
+def mark_palette(t: dict) -> dict:
+    """The banner's palette, in the three keys the mark asks for."""
+    return dict(accent=t["qa"], ink=t["text"], ink_opacity=t["mark_opacity"])
+
 
 THEMES = {
     "light": dict(
         bg="#ffffff", panel="#f6f7f9", border="#d8dce1", text="#15181d",
         muted="#636c76", line="#b6bdc6",
+        mark_opacity="0.20",
         qa="#c2410c", qa_bg="#fff3ec", qa_border="#f0b494",
         eng="#0f766e", eng_bg="#eefaf7", eng_border="#9ad3c9",
         you="#5b43b5", you_bg="#f2effc", you_border="#bfb0ea",
@@ -31,20 +42,22 @@ THEMES = {
     "dark": dict(
         bg="#0d1117", panel="#151b23", border="#303840", text="#e6edf3",
         muted="#9198a1", line="#48505a",
+        mark_opacity="0.26",
         qa="#fb923c", qa_bg="#2a1a10", qa_border="#7a4a22",
         eng="#5eead4", eng_bg="#0d2420", eng_border="#1f5a52",
         you="#b3a4f5", you_bg="#1b1830", you_border="#473d78",
     ),
 }
 
-# state, actor, actor colour key, one-line descriptor
+# state, actor, actor colour key, one-line descriptor, the gate(s) it carries
 STAGES = [
-    ("todo", "pm", None, "groomed, with criteria"),
-    ("writing_tests", "qa", "qa", "a failing test each"),
-    ("in_progress", "engineer", "eng", "makes them pass"),
-    ("review", "qa", "qa", "were they weakened?"),
-    ("verify", "you", "you", "awaiting acceptance"),
-    ("done", "you", "you", "merged, sha recorded"),
+    ("todo", "pm", None, "groomed intent", None),
+    ("speccing", "qa", "qa", "the brief, agreed", "G1"),
+    ("writing_tests", "qa", "qa", "a test per REQ", "G2"),
+    ("in_progress", "engineer", "eng", "makes them pass", "G3"),
+    ("review", "qa + pm", "qa", "proved and filed", "G4·5·6"),
+    ("verify", "you", "you", "awaiting acceptance", None),
+    ("done", "you", "you", "merged, sha recorded", None),
 ]
 
 RECORDS = [
@@ -57,10 +70,10 @@ RECORDS = [
 ]
 
 M = 56                      # page margin
-NW, NG = 153, 34            # node width, gap
-NY, NH = 212, 70            # node top, height
-CW, CG = 344, 28            # record card width, gap
-CY, CH = 446, 104
+NW, NG = 142, 28            # node width, gap
+NY, NH = 216, 74            # node top, height
+CW, CG = 370, 28            # record card width, gap
+CY, CH = 474, 104
 
 
 def esc(s: str) -> str:
@@ -94,9 +107,12 @@ def build(t: dict) -> str:
          f'stroke="{t["border"]}"/>']
 
     # ---- header ----------------------------------------------------------
-    o.append(text(M, 88, "forge", size=52, weight="700", fill=t["text"], spacing="-1.5"))
-    o.append(f'<rect x="{M}" y="100" width="92" height="5" rx="2.5" fill="{t["qa"]}"/>')
-    o.append(text(M, 138, "A reusable agent harness for software projects.",
+    # The mark carries the accent in the header, so the rule that used to sit
+    # under the wordmark would be a second one saying the same thing.
+    o.append(logo.mark(mark_palette(t), x=M, y=46, size=58))
+    o.append(text(M + 58 + 20, 92, "forge", size=52, weight="700",
+                  fill=t["text"], spacing="-1.5"))
+    o.append(text(M, 142, "A reusable agent harness for software projects.",
                   size=19, fill=t["muted"]))
 
     chip_w, chip_x, chip_y = 300, W - M - 300, 56
@@ -108,30 +124,38 @@ def build(t: dict) -> str:
                   size=12, fill=t["muted"], anchor="middle"))
 
     # ---- the cycle -------------------------------------------------------
-    o.append(text(M, 178, "THE CYCLE A TICKET GOES THROUGH", size=11,
+    o.append(text(M, 182, "SEVEN STATES, SIX GATES", size=11,
                   weight="600", fill=t["muted"], spacing="1.8"))
 
-    for i, (state, actor, key, note) in enumerate(STAGES):
+    for i, (state, actor, key, note, gate) in enumerate(STAGES):
         x = node_x(i)
         fill = t[f"{key}_bg"] if key else t["panel"]
         stroke = t[f"{key}_border"] if key else t["border"]
         label = t[key] if key else t["muted"]
-        o.append(text(x + NW / 2, 202, actor, size=11, weight="600", fill=label,
+        o.append(text(x + NW / 2, 206, actor, size=11, weight="600", fill=label,
                       anchor="middle", spacing="1.2"))
         o.append(f'<rect x="{x}" y="{NY}" width="{NW}" height="{NH}" rx="10" '
                  f'fill="{fill}" stroke="{stroke}"/>')
-        o.append(text(x + NW / 2, NY + 30, state, size=15, family=MONO,
+        o.append(text(x + NW / 2, NY + 28, state, size=14, family=MONO,
                       fill=t["text"], anchor="middle"))
-        o.append(text(x + NW / 2, NY + 52, note, size=11, fill=t["muted"], anchor="middle"))
+        o.append(text(x + NW / 2, NY + 48, note, size=10.5, fill=t["muted"], anchor="middle"))
+        # the gate the state carries, as a chip straddling its lower edge
+        if gate:
+            gw = 26 + 7.6 * (len(gate) - 2)
+            gx, gy = x + NW / 2 - gw / 2, NY + NH - 10
+            o.append(f'<rect x="{gx}" y="{gy}" width="{gw}" height="20" rx="10" '
+                     f'fill="{t["bg"]}" stroke="{stroke}"/>')
+            o.append(text(x + NW / 2, gy + 14, gate, size=11, weight="600",
+                          family=MONO, fill=label, anchor="middle"))
         if i < len(STAGES) - 1:
             y = NY + NH / 2
-            o.append(f'<path d="M{x + NW + 6} {y} L{x + NW + NG - 8} {y}" '
+            o.append(f'<path d="M{x + NW + 5} {y} L{x + NW + NG - 7} {y}" '
                      f'stroke="{t["line"]}" stroke-width="1.6" fill="none" marker-end="url(#a)"/>')
 
     # the two ways a ticket comes back; the label sits on the curve, over a
     # patch of background, so the edge reads as labelled rather than crossed
     def arc(src: int, dst: int, depth: int, label: str):
-        top = NY + NH + 6
+        top = NY + NH + 14
         x1, x2 = node_x(src) + NW / 2, node_x(dst) + NW / 2
         o.append(f'<path d="M{x1} {top} C{x1} {depth} {x2} {depth} {x2} {top + 2}" '
                  f'stroke="{t["line"]}" stroke-width="1.6" stroke-dasharray="5 4" '
@@ -142,11 +166,12 @@ def build(t: dict) -> str:
                  f'width="{tw + 2 * pad}" height="22" rx="6" fill="{t["bg"]}"/>')
         o.append(text(mid_x, mid_y + 4, label, size=12, fill=t["muted"], anchor="middle"))
 
-    arc(3, 2, 340, "rejected")
-    arc(2, 1, 392, "the test is wrong")
+    arc(4, 3, 338, "rejected")
+    arc(3, 2, 382, "the test is wrong")
+    arc(2, 1, 426, "the brief is wrong")
 
     # ---- the three records ----------------------------------------------
-    o.append(text(M, 424, "AND THE THREE RECORDS BEHIND IT", size=11,
+    o.append(text(M, 452, "AND THE THREE RECORDS BEHIND IT", size=11,
                   weight="600", fill=t["muted"], spacing="1.8"))
 
     for i, (name, what, detail, validator) in enumerate(RECORDS):

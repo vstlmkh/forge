@@ -10,7 +10,8 @@ it.
 install.sh                clones into ~/.forge and links the shim; re-run to update
 bin/forge                 the CLI: detection, install, render, upgrade
 template/                 the payload copied into a project — the actual product
-assets/banner.py          regenerates the two README banners
+assets/logo.py            the mark: six gates, four cleared
+assets/banner.py          regenerates the two README banners; imports the mark
 docs/                     how the harness works, and how to extend it
 tests/smoke.sh            installs into a throwaway repo and proves every gate fires
 ```
