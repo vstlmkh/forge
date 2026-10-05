@@ -34,7 +34,7 @@ import sys
 # into ~/.forge, and template/ has to be found relative to the real file.
 HERE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 TEMPLATE = os.path.join(HERE, "template")
-VERSION = "1.0.2"
+VERSION = "1.1.0"
 FORGE_NAME = "forge"
 FORGE_URL = "https://github.com/vstlmkh/forge"
 
@@ -64,9 +64,20 @@ PAYLOAD = [
     ("docs/agile/SCHEMA.md", "docs/agile/SCHEMA.md"),
     ("docs/knowledge/README.md", "docs/knowledge/README.md"),
 ]
-# the two role agents that exist in every project; the engineers are rendered
-STATIC_AGENTS = ["pm.md", "qa.md"]
-TRACKER_DIRS = ["backlog", "tasks", "bugs"]
+# The role agents that exist in every project, and the template each is
+# rendered from. They carry one substitution - the model tier - which a project
+# chooses in forge.json under policy.models. A model name is not project
+# vocabulary, but it does belong to the project, so it does not live in the
+# payload. `qa-spec` is a delegate of `qa`: it is dispatched at gate 1 and
+# writes `assignee: qa`, never its own name, so the tracker keeps three
+# identities however many agent files exist.
+ROLE_AGENTS = {
+    "pm": ("_pm.md.tmpl", "pm"),
+    "qa": ("_qa.md.tmpl", "qa"),
+    "qa-spec": ("_qa_spec.md.tmpl", "qa_spec"),
+}
+DEFAULT_MODELS = {"pm": "opus", "qa": "sonnet", "qa_spec": "opus", "engineer": "sonnet"}
+TRACKER_DIRS = ["backlog", "tasks", "bugs", "specs"]
 
 
 # --------------------------------------------------------------------------
@@ -384,7 +395,8 @@ def assemble(project: str, repos: dict, scopes: dict, checks: dict,
                                 "docs", "test", "perf"],
             "never_commit": never,
         },
-        "policy": {"test_first": True, "require_docs": True, "stale_claim_hours": 24},
+        "policy": {"test_first": True, "spec_first": True, "require_docs": True,
+                   "stale_claim_hours": 24},
     }
 
 
@@ -531,12 +543,12 @@ def finish(project: str, repos: dict, scopes: dict, checks: dict) -> dict:
 # --------------------------------------------------------------------------
 
 def render_agents(target: str, cfg: dict, force: bool) -> list[str]:
+    written = render_role_agents(target, cfg, force)
     tmpl_path = os.path.join(TEMPLATE, ".claude", "agents", "_engineer.md.tmpl")
     with open(tmpl_path, encoding="utf-8") as fh:
         tmpl = fh.read()
 
     repos = cfg.get("repos") or {}
-    written = []
     def is_code(s: dict) -> bool:
         return bool(s.get("code", bool(s.get("repo"))))
 
@@ -560,11 +572,12 @@ def render_agents(target: str, cfg: dict, force: bool) -> list[str]:
                 .replace("{{NOTES}}", notes)
                 .replace("{{OTHER_PATHS}}", ", ".join(others) or "none")
                 .replace("{{CREDIT}}", credit(cfg, "comment"))
+                .replace("{{MODEL}}", model_for(cfg, "engineer"))
                 .replace("{{NEVER_COMMIT}}",
                          ", ".join(f"`{p}`" for p in
                                    (cfg.get("git") or {}).get("never_commit") or []) or "none"))
         for agent in agents:
-            if agent in ("pm", "qa"):
+            if agent in ROLE_AGENTS:
                 continue
             dst = os.path.join(target, ".claude", "agents", f"{agent}.md")
             if os.path.exists(dst) and not force:
@@ -672,12 +685,36 @@ def merge_settings(target: str) -> None:
 # commands
 # --------------------------------------------------------------------------
 
+def model_for(cfg: dict, role: str) -> str:
+    models = ((cfg.get("policy") or {}).get("models") or {})
+    return str(models.get(role) or DEFAULT_MODELS.get(role, "sonnet"))
+
+
+def render_role_agents(target: str, cfg: dict, force: bool) -> list[str]:
+    """pm, qa and qa-spec. Rendered rather than copied so that the model tier
+    can come from forge.json - the model is bound to the agent file, not to a
+    dispatch, so per-gate tiers mean per-gate files."""
+    written = []
+    for agent, (tmpl_name, role) in ROLE_AGENTS.items():
+        src = os.path.join(TEMPLATE, ".claude", "agents", tmpl_name)
+        dst = os.path.join(target, ".claude", "agents", f"{agent}.md")
+        if os.path.exists(dst) and not force:
+            continue
+        with open(src, encoding="utf-8") as fh:
+            body = fh.read()
+        body = (body
+                .replace("{{MODEL}}", model_for(cfg, role))
+                .replace("{{CREDIT}}", credit(cfg, "comment")))
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(dst, "w", encoding="utf-8") as fh:
+            fh.write(body)
+        written.append(agent)
+    return written
+
+
 def install_payload(target: str, force: bool) -> None:
     for src_rel, dst_rel in PAYLOAD:
         copy(os.path.join(TEMPLATE, src_rel), os.path.join(target, dst_rel), force)
-    for name in STATIC_AGENTS:
-        copy(os.path.join(TEMPLATE, ".claude", "agents", name),
-             os.path.join(target, ".claude", "agents", name), force)
     tracker = os.path.join(target, "docs", "agile")
     for sub in TRACKER_DIRS:
         d = os.path.join(tracker, sub)
@@ -767,6 +804,49 @@ def cmd_agents(argv: list[str]) -> int:
     return 0
 
 
+IN_FLIGHT = ("speccing", "writing_tests", "in_progress", "review", "verify")
+
+
+def adopt_spec_gate(target: str, cfg: dict, cfg_path: str) -> None:
+    """Decide how a project upgrading into the spec gate adopts it.
+
+    A project upgrades by running the CLI, not by reading a changelog, so the
+    gate must not turn a healthy board red overnight. A board with nothing in
+    flight takes the gate immediately; a board mid-ticket takes it off, loudly,
+    and `forge doctor` keeps asking until someone turns it on."""
+    policy = cfg.setdefault("policy", {})
+    if "spec_first" in policy:
+        return
+    tracker = (cfg.get("paths") or {}).get("tracker", "docs/agile").strip("/")
+    in_flight = []
+    for sub in ("tasks", "bugs"):
+        d = os.path.join(target, *tracker.split("/"), sub)
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if not name.endswith(".md") or name.startswith("."):
+                continue
+            try:
+                with open(os.path.join(d, name), encoding="utf-8") as fh:
+                    head = fh.read(4096)
+            except OSError:
+                continue
+            for line in head.splitlines():
+                if line.startswith("status:"):
+                    if line.split(":", 1)[1].strip() in IN_FLIGHT:
+                        in_flight.append(name)
+                    break
+    policy["spec_first"] = not in_flight
+    write_json(cfg_path, cfg)
+    if in_flight:
+        say(f"  note: {len(in_flight)} ticket(s) are in flight and predate the spec gate.")
+        say("        policy.spec_first is set to false so they can finish.")
+        say("        Set it to true in forge.json once they close; "
+            "`forge doctor` will remind you.")
+    else:
+        say("  policy.spec_first: true - every new ticket is specified before it is tested")
+
+
 def cmd_upgrade(argv: list[str]) -> int:
     target = os.path.abspath(argv[0]) if argv and not argv[0].startswith("-") else os.getcwd()
     cfg_path = os.path.join(target, "forge.json")
@@ -775,9 +855,12 @@ def cmd_upgrade(argv: list[str]) -> int:
     cfg = read_json(cfg_path)
     say(f"refreshing the harness in {target} (forge.json and rendered agents are left alone)")
     install_payload(target, force=True)
+    adopt_spec_gate(target, cfg, cfg_path)
     merge_settings(target)
     if "--no-claude-md" not in argv:
         write_claude_md(target, cfg)
+    for agent in render_role_agents(target, cfg, force=True):
+        say(f"  re-rendered .claude/agents/{agent}.md")
     if "--agents" in argv:
         for agent in render_agents(target, cfg, force=True):
             say(f"  re-rendered .claude/agents/{agent}.md")

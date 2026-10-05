@@ -75,6 +75,8 @@ branch: null
 pr: null
 merge_sha: null
 blocked_by: []
+spec: null
+spec_waiver: null
 docs: []
 docs_waiver: null
 labels: []
@@ -88,7 +90,7 @@ Prove the pipeline end to end.
 
 ## Acceptance criteria
 
-- [ ] GET /health returns 200 with {"status":"ok"}.
+- [ ] (REQ-0001) GET /health returns 200 with {"status":"ok"}.
 
 ## Log
 EOT
@@ -96,6 +98,107 @@ want 0 "a well-formed epic and task lint clean" -- python3 .claude/scripts/agile
 want 0 "next-id advances" -- python3 .claude/scripts/agile.py next-id task
 [ "$(python3 .claude/scripts/agile.py next-id task)" = "TASK-0002" ] \
   && ok "next-id is TASK-0002" || bad "next-id did not advance"
+
+echo "== the spec gate"
+[ -d docs/agile/specs ] && ok "init creates the specs directory" || bad "no docs/agile/specs/"
+
+# a ticket may not reach writing_tests unspecified
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace("status: todo", "status: writing_tests")
+s = s.replace("assignee: null", "assignee: qa")
+open(t, "w").write(s)
+PY2
+OUT="$(python3 .claude/scripts/agile.py lint 2>&1)"; RC=$?
+[ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q "spec" \
+  && ok "writing_tests without a spec is rejected" \
+  || { bad "the spec gate did not fire"; printf '%s\n' "$OUT" | sed 's/^/       /'; }
+
+want 1 "spec new refuses an unknown ticket" -- python3 .claude/scripts/agile.py spec new TASK-9999
+want 0 "spec new scaffolds the spec" -- python3 .claude/scripts/agile.py spec new TASK-0001
+[ -f docs/agile/specs/TASK-0001.md ] && ok "the spec file exists" || bad "spec new wrote nothing"
+want 3 "spec new refuses to clobber" -- python3 .claude/scripts/agile.py spec new TASK-0001
+want 2 "a skeleton spec is not agreed" -- python3 .claude/scripts/agile.py spec check TASK-0001
+[ "$(python3 .claude/scripts/agile.py next-req TASK-0001)" = "REQ-0001" ] \
+  && ok "next-req starts at REQ-0001" || bad "next-req did not start at REQ-0001"
+
+# fill the brief the way qa would at gate 1, and point the ticket at it
+python3 - <<'PY2'
+p = "docs/agile/specs/TASK-0001.md"
+s = open(p).read()
+s = s.replace("status: drafting", "status: agreed")
+s = s.replace(
+    "| _REQ-0001_ | _what must be true when this is done_ | _question_ "
+    "| _user / kb:<note> / code:<path:line>_ |",
+    "| REQ-0001 | GET /health answers 200 with a status field. | agreed | user |\n"
+    "| REQ-0002 | It answers within 50ms. | deferred | user |")
+s = s.replace("| Q1 | REQ-0001 | _the question_ | _filled in when the user answers_ |",
+              "| Q1 | REQ-0001 | Which status code? | 200. |")
+s = s.replace("| ID | Deferred because | Becomes |\n|---|---|---|\n",
+              "| ID | Deferred because | Becomes |\n|---|---|---|\n"
+              "| REQ-0002 | no load harness yet | NO-TICKET (measured elsewhere) |\n")
+s = s.replace("_Behaviour, boundaries and contracts, written against the REQ ids above. Say\n"
+              "what is explicitly out of scope - that is what stops the ticket growing._",
+              "GET /health answers 200 and a JSON body carrying a status field. "
+              "Latency is out of scope.")
+open(p, "w").write(s)
+
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace("spec: null", "spec: specs/TASK-0001.md")
+open(t, "w").write(s)
+PY2
+want 0 "a filled, agreed spec checks clean" -- python3 .claude/scripts/agile.py spec check TASK-0001
+[ "$(python3 .claude/scripts/agile.py next-req TASK-0001)" = "REQ-0003" ] \
+  && ok "next-req advances past the brief" || bad "next-req did not advance"
+
+# a brief nothing traces back to is decoration
+sed -i.bak 's/- \[ \] (REQ-0001) GET/- [ ] GET/' docs/agile/tasks/TASK-0001-first-task.md
+OUT="$(python3 .claude/scripts/agile.py lint 2>&1)"; RC=$?
+[ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q "REQ-0001" \
+  && ok "an untagged acceptance criterion is rejected" \
+  || { bad "the traceability rule did not fire"; printf '%s\n' "$OUT" | sed 's/^/       /'; }
+mv docs/agile/tasks/TASK-0001-first-task.md.bak docs/agile/tasks/TASK-0001-first-task.md
+
+# an orphan spec outlives a ticket that was renamed or deleted
+cp docs/agile/specs/TASK-0001.md docs/agile/specs/TASK-0404.md
+OUT="$(python3 .claude/scripts/agile.py lint 2>&1)"; RC=$?
+[ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q "TASK-0404" \
+  && ok "an orphan spec is rejected" || bad "the orphan spec was accepted"
+rm -f docs/agile/specs/TASK-0404.md
+
+# back to todo so the docs gate below starts where it used to
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace("status: writing_tests", "status: todo")
+s = s.replace("assignee: qa", "assignee: null")
+open(t, "w").write(s)
+PY2
+want 0 "the specified ticket lints clean again" -- python3 .claude/scripts/agile.py lint
+
+echo "== the gates and the handoff payload"
+want 1 "gates refuses a gate that does not exist" -- python3 .claude/scripts/agile.py gates 9
+[ "$(python3 .claude/scripts/agile.py gates | grep -c '^Gate')" = 6 ] \
+  && ok "there are six gates" || bad "the gate table is not six rows"
+want 1 "handoff needs a gate" -- python3 .claude/scripts/agile.py handoff TASK-0001
+want 0 "handoff renders gate 1" -- python3 .claude/scripts/agile.py handoff TASK-0001 --gate 1
+want 2 "handoff refuses a gate the ticket cannot reach" -- \
+  python3 .claude/scripts/agile.py handoff TASK-0001 --gate 4
+OUT="$(python3 .claude/scripts/agile.py handoff TASK-0001 --gate 1)"
+printf '%s' "$OUT" | head -2 | grep -q "GATE 1" \
+  && ok "the contract opens the payload" || bad "handoff buried the contract"
+printf '%s' "$OUT" | head -20 | grep -q "MUST NOT" \
+  && ok "the prohibitions are in the first screen" || bad "the prohibitions are not up front"
+printf '%s' "$OUT" | tail -20 | grep -q "ANCHOR" \
+  && ok "the contract is repeated in the last screen" || bad "handoff lost the anchor"
+# nothing inert may follow the anchor - that is the whole layout rule
+printf '%s' "$OUT" | sed -n '/=== ANCHOR/,$p' | grep -qE '^--- (reference|steps)' \
+  && bad "reference material follows the anchor" \
+  || ok "the anchor is the last thing in the payload"
+printf '%s' "$OUT" | grep -q "api" \
+  && ok "handoff reads the scope from forge.json" || bad "handoff did not resolve the scope"
+printf '%s' "$OUT" | grep -q "Prove the pipeline end to end" \
+  && bad "handoff pasted the ticket body instead of its path" \
+  || ok "handoff carries paths, not pasted file bodies"
 
 echo "== the docs gate"
 # a claim made now, not a literal date - a hardcoded one ages past
@@ -141,6 +244,58 @@ want 0 "for-ticket resolves the note" -- python3 .claude/scripts/kb.py for-ticke
 want 0 "find hits the note" -- python3 .claude/scripts/kb.py find health
 want 2 "find reports a gap as exit 2" -- python3 .claude/scripts/kb.py find nonexistentsubject
 
+echo "== the carryover gate"
+# at verify, every deferred requirement must have become a ticket or an argument
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+text = open(t).read().replace("status: review", "status: verify")
+open(t, "w").write(text)
+p = "docs/agile/specs/TASK-0001.md"
+text = open(p).read().replace("NO-TICKET (measured elsewhere)", "")
+open(p, "w").write(text)
+PY2
+OUT="$(python3 .claude/scripts/agile.py lint 2>&1)"; RC=$?
+[ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q "REQ-0002" \
+  && ok "a carryover row with no ticket blocks verify" \
+  || { bad "the carryover gate did not fire"; printf '%s\n' "$OUT" | sed 's/^/       /'; }
+python3 - <<'PY2'
+p = "docs/agile/specs/TASK-0001.md"
+text = open(p).read().replace(
+    "| REQ-0002 | no load harness yet |  |",
+    "| REQ-0002 | no load harness yet | NO-TICKET (measured elsewhere) |")
+open(p, "w").write(text)
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+text = open(t).read().replace("status: verify", "status: review")
+open(t, "w").write(text)
+PY2
+want 0 "an argued NO-TICKET clears it" -- python3 .claude/scripts/agile.py lint
+
+echo "== the role agents are rendered"
+for a in pm qa qa-spec; do
+  [ -f ".claude/agents/$a.md" ] && ok "$a is rendered" || bad "$a is missing"
+  grep -q "{{" ".claude/agents/$a.md" && bad "unrendered placeholder in $a" \
+    || ok "no placeholders left in $a"
+done
+grep -q "^model: opus" .claude/agents/qa-spec.md \
+  && ok "qa-spec takes its model from policy.models" \
+  || bad "qa-spec did not get its model"
+python3 - <<'PY2'
+import json
+c = json.load(open("forge.json"))
+c.setdefault("policy", {}).setdefault("models", {})["qa"] = "haiku"
+json.dump(c, open("forge.json", "w"), indent=2)
+PY2
+"$FORGE/bin/forge" agents "$WORK" --force >/dev/null 2>&1
+grep -q "^model: haiku" .claude/agents/qa.md \
+  && ok "policy.models overrides a role's model" || bad "policy.models was ignored"
+python3 - <<'PY2'
+import json
+c = json.load(open("forge.json"))
+c["policy"]["models"].pop("qa")
+json.dump(c, open("forge.json", "w"), indent=2)
+PY2
+"$FORGE/bin/forge" agents "$WORK" --force >/dev/null 2>&1
+
 echo "== generated indexes are byte-stable"
 python3 .claude/scripts/agile.py index >/dev/null
 cp docs/agile/INDEX.md /tmp/forge-index-a
@@ -158,8 +313,83 @@ hook() { printf '%s' "$2" | python3 ".claude/scripts/$1" >/dev/null 2>&1; echo $
   && ok "guard-kb denies a misnamed note" || bad "guard-kb allowed a misnamed note"
 [ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/knowledge/nope/business-rule/{business-rule} x y - 2026-10-03.md"}}')" = 2 ] \
   && ok "guard-kb denies an unknown scope" || bad "guard-kb allowed an unknown scope"
-[ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/tasks/TASK-0009-new.md","content":"---\nid: TASK-0009\n---\n"}}')" = 2 ] \
+[ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/tasks/TASK-0009-new.md","content":"---\nid: TASK-0009\nspec: null\n---\n"}}')" = 2 ] \
   && ok "guard-kb denies a new ticket with no docs:" || bad "guard-kb allowed a ticket with no docs:"
+[ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/tasks/TASK-0009-new.md","content":"---\nid: TASK-0009\ndocs: []\n---\n"}}')" = 2 ] \
+  && ok "guard-kb denies a new ticket with no spec:" || bad "guard-kb allowed a ticket with no spec:"
+[ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/specs/notes.md"}}')" = 2 ] \
+  && ok "guard-kb denies a misnamed spec" || bad "guard-kb allowed a misnamed spec"
+[ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/specs/TASK-0404.md"}}')" = 2 ] \
+  && ok "guard-kb denies a spec for a ticket that does not exist" \
+  || bad "guard-kb allowed an orphan spec"
+[ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/specs/TASK-0001.md"}}')" = 0 ] \
+  && ok "guard-kb allows a real spec" || bad "guard-kb blocked a real spec"
+
+echo "== upgrading a board that predates the spec gate"
+OLD="$WORK/../forge-smoke-legacy-$$"
+rm -rf "$OLD"; mkdir -p "$OLD"; (cd "$OLD" && git init -q .)
+"$FORGE/bin/forge" init "$OLD" --preset monorepo --name Legacy >/dev/null 2>&1
+  cd "$OLD" || exit 1
+  cp "$WORK/docs/agile/backlog/EPIC-001-bootstrap.md" docs/agile/backlog/
+  # a ticket written before `spec:` existed, caught mid-flight by the upgrade
+  cat > docs/agile/tasks/TASK-0001-legacy.md <<EOT
+---
+id: TASK-0001
+type: task
+title: Written before the spec gate existed
+status: in_progress
+parent: EPIC-001
+scope: api
+priority: P2
+assignee: api-engineer
+claimed_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+branch: feat/legacy
+pr: null
+merge_sha: null
+blocked_by: []
+docs: []
+docs_waiver: NO-DOCS (a fixture)
+labels: []
+created: $TODAY
+updated: $TODAY
+---
+
+## Goal
+
+Exist.
+
+## Acceptance criteria
+
+- [ ] it works
+
+## Log
+
+- $TODAY opened before the gate
+EOT
+  python3 - <<'PY2'
+import json
+c = json.load(open("forge.json"))
+c["policy"].pop("spec_first", None)      # as an older forge.json would be
+json.dump(c, open("forge.json", "w"), indent=2)
+PY2
+  "$FORGE/bin/forge" upgrade . >/dev/null 2>&1
+  SF="$(python3 -c 'import json;print(json.load(open("forge.json"))["policy"]["spec_first"])')"
+  [ "$SF" = "False" ] && ok "upgrade leaves the gate off while tickets are in flight" \
+    || bad "upgrade turned the spec gate on under a live board (spec_first=$SF)"
+  OUT="$(python3 .claude/scripts/agile.py lint 2>&1)"; RC=$?
+  [ "$RC" != 1 ] && ! printf '%s' "$OUT" | grep -q "ERROR" \
+    && ok "a pre-gate board still lints without errors" \
+    || { bad "upgrading broke a healthy board"; printf '%s\n' "$OUT" | sed 's/^/       /'; }
+  printf '%s' "$OUT" | grep -q "spec_first" \
+    && ok "lint says what turning the gate on would cost" \
+    || bad "lint is silent about the disabled gate"
+  python3 .claude/scripts/forge.py doctor 2>&1 | grep -q "spec_first" \
+    && ok "doctor keeps asking for the gate to be turned on" \
+    || bad "doctor does not mention the disabled gate"
+  [ -d docs/agile/specs ] && ok "upgrade creates specs/ in an existing project" \
+    || bad "upgrade did not create specs/"
+cd "$WORK" || exit 1
+rm -rf "$OLD"
 
 echo "== detection and --auto"
 FIX="$WORK/../forge-smoke-fixture-$$"

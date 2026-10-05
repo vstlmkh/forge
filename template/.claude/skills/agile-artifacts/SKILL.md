@@ -23,6 +23,10 @@ python3 .claude/scripts/agile.py lint              # validate everything; exit 2
 python3 .claude/scripts/agile.py index             # regenerate the board
 python3 .claude/scripts/agile.py next-id task      # -> TASK-0009
 python3 .claude/scripts/agile.py show TASK-0009    # -> JSON {path, frontmatter}
+python3 .claude/scripts/agile.py spec new TASK-0009   # scaffold the ticket's spec
+python3 .claude/scripts/agile.py spec show TASK-0009  # -> JSON {brief, questions, carryover}
+python3 .claude/scripts/agile.py next-req TASK-0009   # -> REQ-0004
+python3 .claude/scripts/agile.py gates             # the six gates and their contracts
 python3 .claude/scripts/kb.py for-ticket TASK-0009 # the ticket's knowledge-base reading list
 python3 .claude/scripts/kb.py lint                 # validate the knowledge base; exit 2 = issues
 python3 .claude/scripts/forge.py scopes            # the legal scopes and who owns each
@@ -67,7 +71,9 @@ re-run `agile.py index`.
 1. `agile.py next-id <kind>` — never guess an ID, never reuse one.
 2. Write `<tracker>/<folder>/<ID>-<kebab-slug>.md` with the full frontmatter
    block from `SCHEMA.md`. **Every field, including the null ones.** A missing
-   field is a lint error, not a shortcut.
+   field is a lint error, not a shortcut — and a new task or bug with no `docs:`
+   or no `spec:` is refused outright by a `PreToolUse` hook, because those two
+   fields are what make the consult step and the grilling step happen at all.
 3. `created` and `updated` are today's date — get it from `date +%F`, do not
    assume.
 4. `agile.py lint`, then commit:
@@ -79,11 +85,12 @@ as the last thing it does, so the window for an ID collision stays near zero.
 
 ## The claim protocol — a compare-and-swap, not a lock
 
-**`qa` claims, not the engineer.** A ticket leaves `todo` into `writing_tests`,
-held by `qa`, which writes the failing tests and then hands the ticket to an
-engineer in `in_progress`. An engineer never claims out of `todo`; by the time it
-sees a ticket, the claim already exists and the branch already has a red test
-commit on it.
+**`qa` claims, not the engineer.** A ticket leaves `todo` into `speccing`, held
+by `qa`, which grills it into a brief, writes the failing tests against that
+brief in `writing_tests`, and only then hands the ticket to an engineer in
+`in_progress`. An engineer never claims out of `todo`; by the time it sees a
+ticket, the claim already exists, the brief is agreed and the branch already has
+a red test commit on it.
 
 There is no central lock file. The claim is a single `Edit` whose `old_string`
 is the contiguous unclaimed block. Because `Edit` requires an exact match, a
@@ -103,7 +110,7 @@ racing second agent's edit **fails** — and that failure is the lock.
    claimed_at: null
    ```
 
-   `new_string` — same block with `status: writing_tests`, `assignee: qa`, and
+   `new_string` — same block with `status: speccing`, `assignee: qa`, and
    `date -u +%Y-%m-%dT%H:%M:%SZ`.
 3. **If the Edit fails, you lost the race.** Do not retry, do not re-read and
    force it through. Report the loss and pick another ticket.
@@ -112,7 +119,10 @@ racing second agent's edit **fails** — and that failure is the lock.
 5. Re-read the file and confirm your own name is in `assignee` before starting
    work.
 
-The handover to the engineer is a second edit of the same block:
+`speccing -> writing_tests` is a second edit of the same block, by the same
+agent — the claim does not change hands, the stage does.
+
+The handover to the engineer is a third edit of the same block:
 `writing_tests -> in_progress`, `assignee` to the engineer that owns the scope,
 `claimed_at` refreshed. `branch` must already be filled in — the engineer
 continues on `qa`'s branch rather than cutting its own.
@@ -128,6 +138,11 @@ be on two branches in the same one, no matter how cleanly their tickets claim.
 be `writing_tests`, `in_progress` or `review`.** The test-writing stage holds the
 tree just as firmly as implementation — `qa` is committing to a branch in it.
 
+**`speccing` deliberately does not count.** It cuts no branch and writes nothing
+outside the tracker, so the next ticket can be specified while this one is being
+implemented. That is the one piece of real parallelism the cycle offers in a
+monorepo, and it is not an oversight to be tidied away.
+
 In a monorepo that means one ticket at a time, full stop. In a multi-repo
 workspace it means one ticket per repository, so the real parallelism is one
 agent per repository and nothing more. `forge.py repos` tells you which is which.
@@ -140,10 +155,15 @@ catch people out:
 - **You may not close your own work.** An engineer stops at `review`. QA moves
   `review -> verify`, which means *awaiting the user's acceptance*. Only the
   orchestrator, inside `/agile:close`, sets `done`.
-- **There is no `todo -> in_progress`.** Every ticket goes through
-  `writing_tests` first. A ticket whose criteria cannot be expressed as a test
-  still passes through the stage, carrying a `NO-TEST (<reason>)` waiver from
-  `qa` — see `agile-dod`.
+- **There is no `todo -> writing_tests` and no `todo -> in_progress`.** Every
+  ticket is specified before it is tested and tested before it is implemented. A
+  ticket too small to grill still passes through `speccing`, carrying
+  `spec_waiver: NO-SPEC (<reason>)`; one whose requirements cannot be expressed
+  as a test still passes through `writing_tests`, carrying `NO-TEST (<reason>)`.
+  See `agile-dod`.
+- **`writing_tests -> speccing`** is the honest move when the brief, rather than
+  the test, turns out to be wrong. It keeps the claim and the spec file where
+  `-> todo` would throw both away.
 - **An engineer may hand a ticket back to `writing_tests`** when a test is
   genuinely wrong. That is a legitimate edge, and it is the only sanctioned
   alternative to editing `qa`'s tests — which is never allowed.
@@ -154,14 +174,49 @@ catch people out:
 
 ## Editing a ticket you have claimed
 
-You may change: `status`, `branch`, `pr`, `docs`, `docs_waiver`, `## Log`,
-`## Root cause`, `## Implementation notes`, and tick `## Acceptance criteria`
-boxes you have genuinely satisfied. Adding to `docs` is how you record a note
+You may change: `status`, `branch`, `pr`, `spec`, `docs`, `docs_waiver`,
+`## Log`, `## Root cause`, `## Implementation notes`, and tick
+`## Acceptance criteria` boxes you have genuinely satisfied. Adding to `docs` is how you record a note
 your own work produced — you extend that list, you do not clear what `pm` put
 there. You may **not** change `id`, `type`, `parent`, `scope`, `priority`,
 `severity`, or the acceptance criteria text itself. If the criteria are wrong or
 the scope is bigger than stated, say so in `## Log` and hand it back to `pm` —
 do not quietly redefine the ticket to match what you built.
+
+## The spec is the contract
+
+A task or bug carries `spec:` — either `specs/<ID>.md` or `null` with
+`spec_waiver: NO-SPEC (<reason>)`. The file is **created by the script, never by
+hand**, for the same reason a knowledge-base note is:
+
+```bash
+python3 .claude/scripts/agile.py spec new TASK-0231   # then set the spec: it prints
+```
+
+A `PreToolUse` hook denies a spec file that is not named after an existing
+ticket, and `lint` reports an orphan spec as an error — a spec that outlived its
+ticket is a document nobody will ever reconcile.
+
+Inside it, requirement ids are allocated with `agile.py next-req <ID>`. They are
+**per-ticket, never reused and never renumbered**, exactly like artifact ids: a
+requirement that is dropped keeps its row with `Status: dropped`, so a REQ id
+written into a test name or a commit message stays meaningful. The full
+specification is `SCHEMA.md` §10.
+
+Who may write what:
+
+| | May write |
+|---|---|
+| `qa`, in `speccing` | the whole file |
+| `qa`, later | nothing — a brief that moves after the tests were written is not a brief |
+| `pm`, at gate 6 | the `Becomes` cell of a `## Carryover` row, and nothing else |
+| anyone else | nothing |
+
+**Gates 5 and 6 run at the same time, and that is only safe because their file
+sets are disjoint.** At gate 5 `qa` writes the knowledge base and this ticket's
+`## Log`; at gate 6 `pm` writes *other* tickets, the parent, and those carryover
+cells. Neither touches the other's files, and `pm` in particular does not edit
+the ticket under review.
 
 ## Frontmatter grammar
 

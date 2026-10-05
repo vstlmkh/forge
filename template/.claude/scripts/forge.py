@@ -31,6 +31,19 @@ FORGE_URL = "https://github.com/vstlmkh/forge"
 
 DEFAULT_PATHS = {"tracker": "docs/agile", "kb": "docs/knowledge"}
 
+# The roles whose agent file carries a model. A project chooses the tier in
+# forge.json under policy.models; `forge agents` renders it in. The model is
+# bound to the agent file, not to a dispatch, which is why the mapping is per
+# role rather than per gate.
+MODEL_ROLES = ("pm", "qa", "qa_spec", "engineer")
+
+# Dispatchable agent -> the identity it writes into a ticket's `assignee`. The
+# tracker keeps three identities (pm, qa, the scope's engineer) however many
+# agent files a project renders, so that invariant 7 and `forge.py agents` keep
+# meaning what they say. A delegate never writes its own name.
+AGENT_ALIASES = {"qa-spec": "qa"}
+DEFAULT_MODELS = {"pm": "opus", "qa": "sonnet", "qa_spec": "opus", "engineer": "sonnet"}
+
 # The knowledge-base taxonomy is deliberately *not* configurable: it is the part
 # of the convention that makes notes from one project legible in the next. What
 # a project may change is which scopes exist and which types are locked to one.
@@ -168,6 +181,16 @@ class Config:
         self.stale_claim_hours = int(policy.get("stale_claim_hours", 24))
         self.test_first = bool(policy.get("test_first", True))
         self.require_docs = bool(policy.get("require_docs", True))
+        # false only while a project upgraded mid-flight drains its board; see
+        # SCHEMA.md §10 and `forge doctor`
+        self.spec_first = bool(policy.get("spec_first", True))
+        self.models = dict(policy.get("models") or {})
+
+    def model_for(self, role: str) -> str:
+        """The model tier an agent file is rendered with. Not project
+        vocabulary, but it does belong to the project, so it lives in
+        forge.json rather than in the payload."""
+        return str(self.models.get(role) or DEFAULT_MODELS.get(role, "sonnet"))
 
     # ---- derived vocabulary ------------------------------------------------
 
@@ -256,6 +279,21 @@ class Config:
                     out.append(f"kb.locked_types.{t}: '{s}' is not in kb.scopes")
         if not os.path.isdir(self.tracker_dir()):
             out.append(f"paths.tracker: {self.tracker_rel}/ does not exist")
+        elif not os.path.isdir(os.path.join(self.tracker_dir(), "specs")):
+            out.append(f"paths.tracker: {self.tracker_rel}/specs/ does not exist - "
+                       "run `forge upgrade` to create it")
+        if not self.spec_first:
+            out.append("policy.spec_first: off - tickets may reach writing_tests "
+                       "unspecified. Turn it on once the board predating the gate "
+                       "has drained; `agile.py lint` names what still would fail.")
+        for agent in sorted(AGENT_ALIASES):
+            if not os.path.isfile(os.path.join(self.root, ".claude", "agents", f"{agent}.md")):
+                out.append(f"agents: '{agent}' is dispatched by the gate contract but "
+                           f".claude/agents/{agent}.md is missing - run `forge agents --force`")
+        for role, model in sorted(self.models.items()):
+            if role not in MODEL_ROLES:
+                out.append(f"policy.models.{role}: '{role}' is not a model role "
+                           f"({', '.join(MODEL_ROLES)})")
         if not os.path.isdir(self.kb_dir()):
             out.append(f"paths.kb: {self.kb_rel}/ does not exist")
         return out

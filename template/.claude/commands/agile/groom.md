@@ -5,7 +5,7 @@ argument-hint: [what you want built, in one or two sentences]
 
 Groom this request into tracker artifacts: **$ARGUMENTS**
 
-Delegate to the `pm` subagent. Give it the request verbatim plus any context
+Delegate to the `pm` subagent. Grooming ends at `todo`: `pm` writes a testable intent and clear boundaries, and the detail a test actually needs is grilled out of it with the user at gate 1 of `/agile:work`. Do not ask `pm` to anticipate every boundary here — that is what produces a confident guess. Give it the request verbatim plus any context
 from this conversation it would otherwise have to rediscover.
 
 The PM must:

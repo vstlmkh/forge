@@ -53,9 +53,13 @@ arrives.
 
 ```jsonc
 "policy": {
+  "spec_first": true,          // the cycle's speccing stage, and gate 1
   "test_first": true,          // the cycle's writing_tests stage
   "require_docs": true,        // the docs:/NO-DOCS gate at review
-  "stale_claim_hours": 24      // when lint warns about an abandoned claim
+  "stale_claim_hours": 24,     // when lint warns about an abandoned claim
+  "models": {                  // the tier each rendered agent runs on
+    "pm": "opus", "qa": "sonnet", "qa_spec": "opus", "engineer": "sonnet"
+  }
 },
 "git": { "pull_requests": false }   // for a project that merges locally
 ```
@@ -63,6 +67,19 @@ arrives.
 `require_docs: false` turns the knowledge-base gate into a convention instead of
 a check. Think twice: it is the gate that stops a codebase relearning the same
 rule every quarter.
+
+`spec_first: false` lets a ticket reach `writing_tests` with no agreed brief,
+and restores the old `todo -> writing_tests` edge. **It exists for one
+situation**: `forge upgrade` sets it on a project that has tickets in flight, so
+that the new invariants arrive as warnings rather than turning a healthy board
+red mid-ticket. `agile.py lint` names the tickets that would fail and
+`forge doctor` keeps asking; turn it on once the board has drained.
+
+`models` chooses the tier each rendered agent runs on, and takes effect on
+`forge agents --force`. Gate 1 is the only gate that is pure judgement — there
+is nothing to run, and a plausible-sounding brief looks exactly like a correct
+one — which is why `qa_spec` defaults to the strongest tier while the gates that
+check things do not.
 
 ## Two repositories, or twenty
 

@@ -26,6 +26,9 @@ Refuse to proceed, and say why, if:
   that reached `verify` without passing through `writing_tests` has skipped the
   test-first gate, and closing it silently launders that gap;
 - `lint` reports an error on this ticket, from either validator;
+- the spec's `## Carryover` has a row with no ticket id and no argued
+  `NO-TICKET (<reason>)` — gate 6 did not run, and closing now is how deferred
+  work disappears;
 - `docs:` is empty and there is no `docs_waiver: NO-DOCS (<reason>)` — closing a
   ticket that documented nothing and never said why launders exactly the gap the
   waiver exists to expose;

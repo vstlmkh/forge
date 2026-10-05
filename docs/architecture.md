@@ -28,7 +28,8 @@ in every installation, which is what makes `forge upgrade` safe.
 forge.json ──► forge.py ──► agile.py ──► docs/agile/INDEX.md
      │             │    └──► kb.py    ──► docs/knowledge/INDEX.md
      │             └──► guard-*.py, kb-context.py, kb-nudge.py   (hooks)
-     └──► bin/forge ──► .claude/agents/<scope>-engineer.md, the CLAUDE.md block
+     └──► bin/forge ──► .claude/agents/{pm,qa,qa-spec,<scope>-engineer}.md,
+                         the CLAUDE.md block
 ```
 
 `agile.py` owns the frontmatter parser — a deliberately restricted YAML subset:
@@ -36,12 +37,48 @@ flat keys, flat lists, nothing nested. `kb.py` imports it, so the two records
 speak the same dialect and a note cannot drift into syntax the tracker could not
 parse. Both are stdlib-only because they run inside hooks, on every turn.
 
+## Why the spec is a separate file
+
+A ticket's acceptance criteria say what to do. They are written by `pm` at
+grooming, before anyone has tried to write a test against them, which is exactly
+when the detail a test needs is still unknown. The spec at
+`docs/agile/specs/<ID>.md` is where that detail is settled: `qa` answers what the
+repository can answer, puts the rest to the user as one batch of questions
+through the top-level session, and records the result as numbered requirements.
+
+It is a separate file rather than more sections in the ticket for one reason
+that is about cost. The ticket's `## Log` grows with every gate and every
+rejection; by the time the engineer reads it, most of it is history. Splitting
+the brief out means the engineer is handed `## Brief` and `## Spec` and nothing
+else, and the same is true of every later gate — `agile.py handoff` carries a
+different slice to each one. The ticket stays the record of what happened; the
+spec stays the record of what was agreed.
+
+The second reason is that it makes the gate checkable. The spec's own
+`status: agreed` is what `lint` reads to decide whether a ticket may reach
+`writing_tests` at all, and the requirement ids are what let a test, an evidence
+line and a deferred ticket all point at the same thing.
+
+## Why the dispatch prompt is built by a script
+
+`agile.py handoff <ID> --gate <N>` renders a fixed five-part payload: the gate's
+contract, the prohibitions that bind at that gate, the reference material, the
+steps, and then the contract and prohibitions again, compressed.
+
+The repetition is not redundancy. Attention falls off in the middle of a long
+prompt, so anything binding is placed in the first screen and the last, and the
+middle carries only inert reference — and that reference is paths and commands
+rather than pasted file bodies, which is also what keeps a payload around 700
+tokens instead of several thousand. A model tier per role lives in
+`forge.json` under `policy.models`, because a model is bound to an agent file
+rather than to a dispatch.
+
 ## The hooks, and what each one is for
 
 | Hook | Event | Effect |
 |---|---|---|
 | `guard-index.py` | `PreToolUse` | denies a hand-edit of either generated `INDEX.md` |
-| `guard-kb.py` | `PreToolUse` | denies a misfiled or misnamed note, a new ticket with no `docs:`, and writes under a disowned knowledge directory |
+| `guard-kb.py` | `PreToolUse` | denies a misfiled or misnamed note, a new ticket with no `docs:` or no `spec:`, a spec not named after an existing ticket, and writes under a disowned knowledge directory |
 | `kb-nudge.py` | `PostToolUse` | catches a ticket moved to `review`/`done` with an empty `docs:`, while the agent still has the context to file the note |
 | `kb-context.py` | `UserPromptSubmit` | injects the knowledge base's coverage when a cycle command starts, so consulting it is cheap at the one moment it matters |
 | `agile.py index`, `kb.py index` | `Stop` | regenerate both boards once per turn |

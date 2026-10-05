@@ -18,6 +18,7 @@ docs/agile/
 ├── backlog/   EPIC-*.md, STORY-*.md    planning containers
 ├── tasks/     TASK-*.md                units of implementation work
 ├── bugs/      BUG-*.md                 defects
+├── specs/     TASK-*.md, BUG-*.md      the agreed brief behind each ticket
 ├── INDEX.md                            the board — GENERATED, never edited
 ├── SCHEMA.md                           the specification
 └── README.md                           this file
@@ -35,7 +36,8 @@ denies any attempt to hand-edit `INDEX.md`.
 |---|---|---|
 | `pm` | the tracker and the knowledge base — grooming, decomposition, priority, bug triage | writes application code |
 | one engineer per code scope | that scope's repository | touches another scope, merges, closes |
-| `qa` | the tests and the verdict — writes the failing tests first, then runs the checks, records evidence, files bugs | writes production code, edits its own tests during `review`, closes a ticket |
+| `qa` | the brief, the tests and the verdict — grills the request into numbered requirements, writes the failing tests, runs the checks, records evidence, files bugs | writes production code, asks the user directly, edits its own tests during `review`, closes a ticket |
+| `qa-spec` | gate 1 only — a delegate of `qa`, so it writes `assignee: qa` and never its own name | everything `qa` never does, plus tests |
 
 `python3 .claude/scripts/forge.py scopes` lists the engineers this project
 actually has.
@@ -51,7 +53,7 @@ the three. That single reserved step is what keeps the gate real.
 | `/agile:groom <request>` | PM turns a raw request into epics, stories and single-scope tasks |
 | `/agile:board` | regenerates the board, validates it, reports drift |
 | `/agile:next` | picks the next eligible ticket and explains the choice |
-| `/agile:work <ID>` | QA writes failing tests → engineer → QA reviews, stopping at `verify` |
+| `/agile:work <ID>` | the six gates: spec → tests → implement → validate → document → board, stopping at `verify` |
 | `/agile:verify <ID>` | runs the QA review gate on its own |
 | `/agile:close <ID>` | merges, records the sha, closes — one commit |
 | `/agile:bug <symptom>` | files a bug with a reproduction and triages it |
@@ -90,29 +92,53 @@ TASK-0001" — the commands are the well-lit path, not a cage.
 
 ## The lifecycle
 
-The cycle is test-first: `qa` writes the failing tests before anyone implements
-anything, and judges the result against those same tests afterwards.
+The cycle is specification-first and then test-first: `qa` settles what the
+ticket means before anyone writes a test, writes the failing tests before anyone
+implements anything, and judges the result against both afterwards.
 
 ```
-       pm            qa              engineer           qa           you
-raw ──► todo ──► writing_tests ──► in_progress ──PR──► review ──► verify ──► done
-                     ▲   red tests      │  ▲              │          │
-                     └──test is wrong───┘  └───rejected────┴──────────┘
+       pm         qa          qa            engineer        qa + pm        you
+raw ──► todo ──► speccing ──► writing_tests ──► in_progress ──PR──► review ──► verify ──► done
+                   ▲  brief      ▲  red tests      │  ▲               │           │
+                   └─────────────┴──test is wrong──┘  └───rejected─────┴───────────┘
 ```
 
-- **`writing_tests`** — `qa` claims the ticket, cuts the branch, writes a test
-  per acceptance criterion, proves them red, and commits the tests alone.
+- **`speccing`** — `qa` claims the ticket, answers what the knowledge base and
+  the code can answer, and turns what is left into one batch of questions. **You**
+  put those to the user; `qa` folds the answers into a numbered brief, a
+  carryover list and a spec. It cuts no branch here, so the next ticket can be
+  specified while this one is being built.
+- **`writing_tests`** — `qa` cuts the branch, writes a test per agreed
+  requirement, proves them red, and commits the tests alone.
 - **`in_progress`** — the engineer continues on that branch and implements until
   the tests pass. It may not edit them; if a test is genuinely wrong it hands the
-  ticket back to `writing_tests` and argues its case in `## Log`.
+  ticket back to `writing_tests` and argues its case in `## Log`. It may not add
+  a requirement the brief does not carry, either.
 - **`review`** — `qa` runs its tests, diffs them against its red commit to prove
-  they were not weakened, and checks the Definition of Done.
+  they were not weakened, proves each requirement, and judges the notes the
+  engineer filed. In parallel, `pm` turns each carryover row into a real ticket.
 - **`verify`** — awaiting *your* acceptance. Nothing happens automatically here.
 
-There is no `todo -> in_progress`: every ticket passes through `writing_tests`.
-Where no automated test is possible — a value in `.env.example`, a linter config,
-a workflow file — `qa` records a `NO-TEST (<reason>)` waiver naming the check
-that will substitute for it, and that check becomes binding at the review gate.
+There is no `todo -> writing_tests` and no `todo -> in_progress`: every ticket
+is specified before it is tested and tested before it is implemented. Each stage
+has a waiver for the case where it genuinely does not apply — `NO-SPEC` for a
+ticket with nothing to grill, `NO-TEST` for one with nothing to call, `NO-DOCS`
+for one that established nothing durable, `NO-TICKET` for a deferred requirement
+that will never become work. A waiver is a claim somebody can disagree with; a
+skipped stage is not, which is why the waiver exists.
+
+Six gates sit on those transitions. The contract for each one is data, not
+prose:
+
+```bash
+python3 .claude/scripts/agile.py gates
+python3 .claude/scripts/agile.py handoff TASK-0231 --gate 3
+```
+
+`handoff` is how the top-level session dispatches a subagent: it builds the
+prompt with the binding instructions first and repeated last, and the reference
+material in between as paths and commands rather than pasted files. An
+instruction in the middle of a long prompt is one that will not be followed.
 
 A ticket that has not been through `qa` cannot reach `verify`, and a ticket that
 is not in `verify` cannot be closed. Both rules are checked by the validator, not

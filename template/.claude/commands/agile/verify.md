@@ -12,7 +12,7 @@ hand rather than through `/agile:work`.
 python3 .claude/scripts/agile.py show $ARGUMENTS
 ```
 
-Dispatch the `qa` subagent with the ticket path and, if there is one, the PR URL.
+Dispatch the `qa` subagent with the gate 4 payload — `python3 .claude/scripts/agile.py handoff <ID> --gate 4` — and, if there is one, the PR URL. Send it verbatim: the binding instructions are in its first and last screens on purpose.
 
 QA must:
 

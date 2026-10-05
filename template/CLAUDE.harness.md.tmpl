@@ -18,6 +18,7 @@ assuming:
 python3 .claude/scripts/forge.py scopes
 python3 .claude/scripts/forge.py checks <scope>
 python3 .claude/scripts/forge.py doctor
+python3 .claude/scripts/agile.py gates          # the six gates and their contracts
 ```
 
 ## Work goes through the tracker
@@ -29,7 +30,7 @@ Read [`docs/agile/README.md`](docs/agile/README.md) before starting anything;
 /agile:board            what is going on
 /agile:groom <request>  turn a request into tickets
 /agile:next             what to work on
-/agile:work <ID>        QA writes failing tests → implement → QA reviews, stops at verify
+/agile:work <ID>        the six gates: spec → tests → implement → validate → docs → board
 /agile:close <ID>       merge, record the sha, close
 /agile:bug <symptom>    file and triage a defect
 ```
@@ -77,6 +78,10 @@ Agents: {{AGENT_LIST}} in `.claude/agents/`. Their operating rules live in
   `docs/knowledge/INDEX.md`. Change the ticket or the note and let
   `agile.py index` / `kb.py index` regenerate them. A hook denies the write
   anyway.
+- **Every task and bug carries `spec:` and `docs:`.** A `PreToolUse` hook
+  refuses a new ticket missing either, because those two fields are what make
+  the grilling step and the consult step happen at all. `spec:` is
+  `specs/<ID>.md` or null with `spec_waiver: NO-SPEC (<reason>)`.
 - **Every task and bug carries `docs:`.** It is the knowledge-base notes read at
   grooming and actualised at close. A ticket at `review` or beyond with an empty
   `docs:` and no `docs_waiver: NO-DOCS (<reason>)` fails `agile.py lint` — the
@@ -91,11 +96,35 @@ Agents: {{AGENT_LIST}} in `.claude/agents/`. Their operating rules live in
   is two tasks under one story.
 - **One active ticket per working tree**, counting `writing_tests` as active. A
   second concurrent ticket in the same repository corrupts the first.
-- **The cycle is test-first.** `qa` claims a ticket out of `todo` into
-  `writing_tests`, writes a failing test per acceptance criterion and proves it
-  red *before* an engineer starts. There is no `todo -> in_progress`. Where no
-  automated test is possible, `qa` records a `NO-TEST (<reason>)` waiver naming
-  the substitute check.
+- **The cycle is specification-first, then test-first.** `qa` claims a ticket
+  out of `todo` into `speccing`, grills the request into a numbered brief at
+  `docs/agile/specs/<ID>.md`, then writes a failing test per requirement and
+  proves it red *before* an engineer starts. There is no `todo -> writing_tests`
+  and no `todo -> in_progress`. Where nothing can be grilled, `qa` records
+  `spec_waiver: NO-SPEC (<reason>)`; where no automated test is possible, a
+  `NO-TEST (<reason>)` waiver naming the substitute check.
+- **QA does not guess, and does not ask.** At the spec gate it answers what the
+  knowledge base and the code can answer, and everything left becomes a batch of
+  questions that **the top-level session** puts to the user, in one go, in the
+  user's language. An unanswered question becomes carryover — a recorded
+  decision — never an assumption. A requirement `qa` had to settle alone is
+  marked `assumed` and is argued again at validation.
+- **`speccing` does not occupy a working tree.** It cuts no branch and writes
+  only the tracker, so the next ticket can be specified while this one is being
+  implemented. Everything from `writing_tests` onward does occupy it, and the
+  one-ticket-per-tree rule counts from there.
+- **Dispatch prompts are built, not written.**
+  `python3 .claude/scripts/agile.py handoff <ID> --gate <N>` produces them:
+  binding instructions first, repeated last, with reference material in between
+  as paths and commands rather than pasted files. A rule buried in the middle of
+  a long prompt is a rule that will not be followed — do not move the anchor, do
+  not splice a preamble in front of the contract, and do not paste file bodies
+  the agent can read for itself.
+- **A requirement that is not in the brief is not built.** If the work turns out
+  to need one, the engineer says so and hands back; it was never grilled, never
+  costed and never agreed. Deferred requirements are not dropped either: `pm`
+  files a ticket per carryover row at the last gate, or argues
+  `NO-TICKET (<reason>)` in the open.
 - **An engineer never edits the tests `qa` wrote.** It continues on `qa`'s
   branch and implements until they pass. A test it believes is wrong goes back
   via `in_progress -> writing_tests`, argued in `## Log` — never edited, skipped

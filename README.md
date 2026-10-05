@@ -13,9 +13,10 @@
 [![dependencies](https://img.shields.io/badge/dependencies-none-2ea44f)](package.json)
 [![unpacked size](https://img.shields.io/npm/unpacked-size/@vstlmkh/forge?color=555)](https://www.npmjs.com/package/@vstlmkh/forge?activeTab=code)
 
-A reusable agent harness for software projects: a test-first development cycle,
-a Markdown tracker, a typed knowledge base, four role agents and the hooks that
-keep all of it honest — installable into any repository in one command.
+A reusable agent harness for software projects: a six-gate, specification-first
+development cycle, a Markdown tracker, a typed knowledge base, role agents and
+the hooks that keep all of it honest — installable into any repository in one
+command.
 
 ## Install
 
@@ -147,7 +148,7 @@ python3 .claude/scripts/forge.py doctor        # does the config match the repo?
 /agile:board            what is going on
 /agile:groom <request>  turn a request into tickets
 /agile:next             what to work on
-/agile:work <ID>        QA writes failing tests → implement → QA reviews, stops at verify
+/agile:work <ID>        the six gates: spec → tests → implement → validate → document → board
 /agile:close <ID>       merge, record the sha, close
 /agile:bug <symptom>    file and triage a defect
 
@@ -169,9 +170,10 @@ forge self-update        pull the newest forge into ~/.forge
 forge where              print where forge is installed
 ```
 
-`upgrade` never touches `forge.json` or a rendered agent (pass `--agents` to
-re-render those too), and rewrites only the `<!-- forge:begin -->` block in
-`CLAUDE.md`. Running it twice leaves a zero diff.
+`upgrade` never touches `forge.json` except to record a policy a new gate needs,
+leaves the per-scope engineer agents alone (pass `--agents` to re-render those
+too), and rewrites only the `<!-- forge:begin -->` block in `CLAUDE.md`. Running
+it twice leaves a zero diff.
 
 ## Repository layout
 

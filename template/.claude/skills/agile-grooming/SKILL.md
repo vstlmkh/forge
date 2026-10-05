@@ -72,20 +72,32 @@ two engineers do not have to negotiate through you.
 
 ## Acceptance criteria
 
-The criteria are the contract, and under the test-first cycle they are also the
-test plan: `qa` reads them in `writing_tests` and turns each one into a failing
-test *before* an engineer starts. A criterion you cannot imagine a test calling
-is a criterion `qa` will hand straight back to you.
+The criteria are the contract. They are **not** the final specification: `qa`
+takes them into `speccing` at gate 1, grills the gaps out of them with the user,
+and turns the result into a numbered brief that the tests, the evidence and the
+deferred work all trace back to.
 
-An engineer satisfies them literally, and QA verifies them literally.
+That changes what good grooming is. You are not trying to anticipate every
+boundary and error case here — the detail a test actually needs surfaces when
+somebody sits down to write the test, and gate 1 is where that happens, with the
+user reachable. What you owe is a **testable intent**: a criterion specific
+enough that `qa` knows what to ask about, and `## Out of scope` drawn clearly
+enough that the grilling does not reopen the whole feature.
+
+What you must still not do is guess. An ambiguity you resolve silently here
+arrives at gate 1 looking like a settled decision, and nobody will think to
+question it. Mark it `[ASSUMPTION]` or ask.
+
+An engineer satisfies the brief literally, and QA verifies it literally.
 
 - **Observable.** Something you can point at: a response field, a rendered
   element, a command's exit code. Not "the code is clean".
 - **Verifiable by a command where possible.** If a criterion can be a command,
   write the command.
-- **Complete.** If it is not in the criteria, it will not be built. Error paths,
-  empty states, and the migration/backfill question all need a line or an
-  explicit sentence in `## Out of scope`.
+- **Complete enough to grill.** Name the error paths, empty states and the
+  migration/backfill question, or put them in `## Out of scope`. You do not have
+  to answer them — gate 1 will, with the user — but a question nobody wrote down
+  is a question nobody asks.
 - **Independent of implementation.** Say what must be true, not which class to
   create. Put implementation opinions in `## Implementation notes`, where they
   read as guidance rather than as a requirement.
@@ -96,6 +108,9 @@ An engineer satisfies them literally, and QA verifies them literally.
   a workflow file or a docs change has nothing for a test to call. Say so in
   `## Implementation notes`; `qa` will record a `NO-TEST` waiver naming a
   substitute check, and knowing that up front stops it inventing a hollow test.
+- **Honest about the trivial.** A typo fix or a version bump has nothing to
+  grill either. Say so, and `qa` will waive gate 1 with
+  `spec_waiver: NO-SPEC (<reason>)` rather than ceremonially specifying it.
 
 Bad: `- [ ] Add price per day.`
 Good: `- [ ] GET /api/subscriptions returns price_per_day on every plan, as a minor-unit integer, computed as price / billing_period_days and rounded half-up.`

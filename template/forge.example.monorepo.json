@@ -168,6 +168,7 @@
   },
   "policy": {
     "test_first": true,
+    "spec_first": true,
     "require_docs": true,
     "stale_claim_hours": 24
   }

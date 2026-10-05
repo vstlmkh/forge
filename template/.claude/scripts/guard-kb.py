@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """PreToolUse guard: the knowledge-base convention, enforced at write time.
 
-Three rules, all cheap to check and expensive to discover later:
+Four rules, all cheap to check and expensive to discover later:
 
 1. A file written under the knowledge base must sit at
    <kb>/<scope>/<type>/{<type>} <description> - <yyyy-mm-dd>.md, with a legal
    scope and type. A misfiled or misnamed note is invisible to `kb.py find`,
    which is the whole reason the knowledge base exists.
-2. A *new* ticket under <tracker>/{tasks,bugs}/ must carry the `docs:` field.
-   That is the field which records what the knowledge base was consulted for at
-   grooming; requiring it at creation is what makes the consult step happen.
+2. A *new* ticket under <tracker>/{tasks,bugs}/ must carry the `docs:` and
+   `spec:` fields. `docs:` records what the knowledge base was consulted for at
+   grooming; `spec:` is where the agreed brief will live. Requiring both at
+   creation is what makes the consult and the grilling happen at all.
+4. A file under <tracker>/specs/ must be named after an existing ticket.
+   Writing one by hand produces a spec with the section headings subtly wrong,
+   which the validator then shouts about mid-task; `agile.py spec new <ID>`
+   gets them right.
 3. Nothing may be written under a knowledge-base path this project has
    explicitly disowned (forge.json `kb.forbidden_dirs`) - typically a competing
    convention installed by an org-wide plugin. Two conventions over one kind of
@@ -93,6 +98,16 @@ def check_new_ticket(payload, path: str) -> str | None:
     content = (payload.get("tool_input") or {}).get("content")
     if not isinstance(content, str):
         return None
+    if not re.search(r"^spec:", content, re.MULTILINE):
+        return (
+            "This ticket has no `spec:` field. Every task and bug is specified before it "
+            "is tested: qa grills the request into a numbered brief at gate 1 and writes "
+            "it to <tracker>/specs/<ID>.md.\n"
+            "Add, in the frontmatter after `blocked_by:`:\n"
+            "  spec: null              # qa fills this in at gate 1\n"
+            "  spec_waiver: null       # or NO-SPEC (<reason>) for a ticket too small to grill\n"
+            "See docs/agile/SCHEMA.md §10, and `python3 .claude/scripts/agile.py gates 1`."
+        )
     if re.search(r"^docs:", content, re.MULTILINE):
         return None
     return (
@@ -105,6 +120,33 @@ def check_new_ticket(payload, path: str) -> str | None:
         "    - <scope>/<type>/<note>.md      # the notes an engineer must read first\n"
         "  docs_waiver: null                 # or NO-DOCS (<reason>) with docs: []\n"
         "A ticket groomed without reading the knowledge base repeats work it already records."
+    )
+
+
+def check_spec(cfg, path: str) -> str | None:
+    """A spec is named after the ticket it specifies, and is scaffolded by the
+    script. A hand-made one is how an orphan spec gets created."""
+    name = os.path.basename(path)
+    if not name.endswith(".md"):
+        return None
+    ident = name[:-3]
+    if not re.match(r"^(TASK|BUG)-\d{4}$", ident):
+        return (
+            f"'{name}' is not a spec filename. A spec is named after the ticket it "
+            "specifies - <TASK|BUG>-NNNN.md - and is created by the script, which "
+            "gets the frontmatter and the five required sections right:\n"
+            "  python3 .claude/scripts/agile.py spec new <TICKET-ID>\n"
+            "See docs/agile/SCHEMA.md §10."
+        )
+    tracker = cfg.tracker_dir()
+    for sub in ("tasks", "bugs"):
+        d = os.path.join(tracker, sub)
+        if os.path.isdir(d) and any(n.startswith(ident + "-") for n in os.listdir(d)):
+            return None
+    return (
+        f"There is no ticket {ident}, so a spec for it would be an orphan - and "
+        "`agile.py lint` reports those as errors. Create the ticket first, then:\n"
+        "  python3 .claude/scripts/agile.py spec new " + ident
     )
 
 
@@ -127,6 +169,7 @@ def main() -> int:
         forbidden = [d.strip("/") for d in ((cfg.data.get("kb") or {}).get("forbidden_dirs") or [])]
         payload = json.load(sys.stdin)
         ticket_re = re.compile(re.escape(cfg.tracker_rel) + r"/(tasks|bugs)/[^/]+\.md$")
+        spec_re = re.compile(re.escape(cfg.tracker_rel) + r"/specs/[^/]+$")
         for path in targets(payload):
             norm = os.path.normpath(path).replace("\\", "/")
             for bad in forbidden:
@@ -140,6 +183,11 @@ def main() -> int:
                     return 2
             elif ticket_re.search(norm):
                 msg = check_new_ticket(payload, path)
+                if msg:
+                    print("Denied: " + msg, file=sys.stderr)
+                    return 2
+            elif spec_re.search(norm):
+                msg = check_spec(cfg, path)
                 if msg:
                     print("Denied: " + msg, file=sys.stderr)
                     return 2
