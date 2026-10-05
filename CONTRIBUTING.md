@@ -82,7 +82,7 @@ Say which of these the change is, because they have different bars:
 
 Do not open a public issue for a vulnerability — a hook that can be made to
 execute attacker-controlled input, a guard that can be bypassed into a write
-outside the project. Mail <uladzislau.stelmakh@mobyrix.com> instead.
+outside the project. Mail <vladislav.stelmakh02@gmail.com> instead.
 
 ## Working on the code
 

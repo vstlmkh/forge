@@ -264,7 +264,7 @@ Before asking for a feature, check whether it is already a
 [`forge.json` edit](docs/customizing.md) — most of them are. If it genuinely
 cannot be expressed there, that is the feature request worth filing.
 
-Security issues go to <uladzislau.stelmakh@mobyrix.com>, not to the tracker.
+Security issues go to <vladislav.stelmakh02@gmail.com>, not to the tracker.
 
 ## License
 
