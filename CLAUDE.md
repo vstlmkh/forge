@@ -11,6 +11,7 @@ install.sh                clones into ~/.forge and links the shim; re-run to upd
 bin/forge                 the CLI: detection, install, render, upgrade
 template/                 the payload copied into a project — the actual product
 assets/logo.py            the mark: six gates, four cleared
+                          -> logo-{light,dark}.svg, favicon.svg
 assets/banner.py          regenerates the two README banners; imports the mark
 docs/                     how the harness works, and how to extend it
 tests/smoke.sh            installs into a throwaway repo and proves every gate fires
@@ -104,3 +105,25 @@ When a change to the payload would break an existing installation — a renamed
 field, a moved path — say so in the commit body and make `forge upgrade` handle
 it, or make `forge.py doctor` report it. A project upgrades by running the CLI,
 not by reading a changelog.
+
+## The assets
+
+`assets/logo.py` and `assets/banner.py` are generators; the SVGs beside them
+are outputs and are regenerated, never hand-edited. The mark's geometry lives
+in `logo.py` alone and `banner.py` imports it, so the two cannot drift.
+
+| File | Written for |
+|---|---|
+| `banner-{light,dark}.svg` | the README header, switched by `<picture>` |
+| `logo-{light,dark}.svg` | the mark on its own, wherever one ground is known |
+| `favicon.svg` | a browser tab: one file, theme-switched by a `<style>` inside it |
+
+Two files rather than one everywhere except the favicon, because GitHub only
+picks between images with `<picture><source media="(prefers-color-scheme:
+dark)">` and its sanitiser is free to drop a `<style>` from an SVG served as an
+`<img>`. A favicon has no `<picture>` to switch with and is resolved by the
+browser rather than by GitHub, so there the media query is the only option and
+it works.
+
+Nothing in this repository consumes `favicon.svg` yet — there is no site. It
+exists so that whatever fronts the project next does not need the mark redrawn.

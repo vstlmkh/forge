@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates the forge mark in a light and a dark variant.
+"""Generates the forge mark: a light file, a dark file, and one favicon.
 
     python3 assets/logo.py
 
@@ -21,6 +21,13 @@ Geometry worth not "tidying":
   and round caps close up at favicon size and the six gates become one circle,
   which is the whole mark gone;
 - the ring is open. A dot in the middle reads as a record button.
+
+`favicon.svg` is the one file that *may* carry a `<style>` block, because a
+browser resolving `rel="icon"` honours a media query inside the SVG and a tab
+has no `<picture>` to switch with. It is also drawn tighter - a wider ring and
+a fatter stroke - because a favicon is rendered at 16px with no caption, and
+the padding that gives the mark room on a README page only costs it pixels
+there.
 """
 
 import math
@@ -38,16 +45,18 @@ THEMES = {
     "dark":  dict(accent="#fb923c", ink="#e6edf3", ink_opacity="0.26"),
 }
 
+FAVICON_R, FAVICON_STROKE, FAVICON_GAP = 21, 13, 16
 
-def arc(i: int) -> str:
+
+def arc(i: int, r: float = R, gap: float = GAP) -> str:
     """The path for gate `i`, swept clockwise from twelve o'clock."""
     c = SIZE / 2
     span = 360 / GATES
-    a0 = math.radians(-90 + i * span + GAP / 2)
-    a1 = math.radians(-90 + (i + 1) * span - GAP / 2)
-    x0, y0 = c + R * math.cos(a0), c + R * math.sin(a0)
-    x1, y1 = c + R * math.cos(a1), c + R * math.sin(a1)
-    return f'M{x0:.2f} {y0:.2f} A{R} {R} 0 0 1 {x1:.2f} {y1:.2f}'
+    a0 = math.radians(-90 + i * span + gap / 2)
+    a1 = math.radians(-90 + (i + 1) * span - gap / 2)
+    x0, y0 = c + r * math.cos(a0), c + r * math.sin(a0)
+    x1, y1 = c + r * math.cos(a1), c + r * math.sin(a1)
+    return f'M{x0:.2f} {y0:.2f} A{r} {r} 0 0 1 {x1:.2f} {y1:.2f}'
 
 
 def mark(t: dict, x: float = 0, y: float = 0, size: float = SIZE) -> str:
@@ -73,12 +82,33 @@ def build(t: dict) -> str:
             f'{mark(t)}\n</svg>\n')
 
 
+def build_favicon() -> str:
+    lt, dk = THEMES["light"], THEMES["dark"]
+    o = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {SIZE} {SIZE}" '
+         f'width="{SIZE}" height="{SIZE}" role="img" aria-label="forge">',
+         '<style>',
+         f'.c{{stroke:{lt["accent"]}}}',
+         f'.r{{stroke:{lt["ink"]};opacity:{lt["ink_opacity"]}}}',
+         '@media(prefers-color-scheme:dark){'
+         f'.c{{stroke:{dk["accent"]}}}'
+         f'.r{{stroke:{dk["ink"]};opacity:{dk["ink_opacity"]}}}}}',
+         '</style>',
+         f'<g fill="none" stroke-width="{FAVICON_STROKE}" stroke-linecap="butt">']
+    for i in range(GATES):
+        cls = "c" if i < CLEARED else "r"
+        o.append(f'<path class="{cls}" d="{arc(i, FAVICON_R, FAVICON_GAP)}"/>')
+    o += ['</g>', '</svg>']
+    return "\n".join(o) + "\n"
+
+
 def main() -> None:
     here = os.path.dirname(os.path.abspath(__file__))
-    for name, palette in THEMES.items():
-        path = os.path.join(here, f"logo-{name}.svg")
+    written = {f"logo-{n}.svg": build(p) for n, p in THEMES.items()}
+    written["favicon.svg"] = build_favicon()
+    for name, body in written.items():
+        path = os.path.join(here, name)
         with open(path, "w", encoding="utf-8") as fh:
-            fh.write(build(palette))
+            fh.write(body)
         print(f"wrote {os.path.relpath(path, os.path.dirname(here))}")
 
 

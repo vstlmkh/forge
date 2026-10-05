@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="forge">
+<style>
+.c{stroke:#c2410c}
+.r{stroke:#15181d;opacity:0.20}
+@media(prefers-color-scheme:dark){.c{stroke:#fb923c}.r{stroke:#e6edf3;opacity:0.26}}
+</style>
+<g fill="none" stroke-width="13" stroke-linecap="butt">
+<path class="c" d="M34.92 11.20 A21 21 0 0 1 48.55 19.07"/>
+<path class="c" d="M51.47 24.13 A21 21 0 0 1 51.47 39.87"/>
+<path class="c" d="M48.55 44.93 A21 21 0 0 1 34.92 52.80"/>
+<path class="c" d="M29.08 52.80 A21 21 0 0 1 15.45 44.93"/>
+<path class="r" d="M12.53 39.87 A21 21 0 0 1 12.53 24.13"/>
+<path class="r" d="M15.45 19.07 A21 21 0 0 1 29.08 11.20"/>
+</g>
+</svg>

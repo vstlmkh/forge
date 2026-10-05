@@ -183,7 +183,7 @@ forge/
 ├── package.json           the npm package: @vstlmkh/forge
 ├── bin/forge              the CLI: detect, init, agents, upgrade, doctor
 ├── bin/forge.js           the npm shim that runs it
-├── assets/logo.py         the mark: six gates, four cleared
+├── assets/logo.py         the mark -> logo-{light,dark}.svg, favicon.svg
 ├── assets/banner.py       regenerates the banners; imports the mark
 ├── template/              the payload that gets copied into a project
 │   ├── .claude/           agents, skills, commands, scripts, settings
