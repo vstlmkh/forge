@@ -93,6 +93,9 @@ spec_waiver: null        # null | NO-SPEC (<reason>) - only when spec: is null
 docs:                    # knowledge-base notes read at grooming and actualised at close
   - backend/business-rule/{business-rule} subscription proration - 2026-10-03.md
 docs_waiver: null        # null | NO-DOCS (<reason>) - only when docs: is empty
+lessons: []              # [LESSON-0003] - what this ticket taught about working here, see §11
+lessons_waiver: null     # null | NO-LESSON (<reason>) - only when lessons: is empty
+                         # both are optional until `verify`: nothing is known at grooming
 labels: [billing]
 created: 2026-10-03
 updated: 2026-10-03
@@ -226,7 +229,9 @@ not who is expected to act.
 17. `spec`, when set, is exactly `specs/<ID>.md`. The field exists so that "this ticket has no spec" can be said out loud; it is not a choice of layout.
 18. Every spec file names an existing task or bug, and that ticket's `spec:` names it back — the same two-way link as `docs:`/`tickets:` in §9. An orphan spec is an error: it outlived a ticket that was renamed or deleted.
 19. Every requirement in a spec's `## Brief` that is `agreed` or `assumed` appears in the ticket's `## Acceptance criteria`, tagged `(REQ-NNNN)`. A brief nothing downstream mentions is decoration.
-20. The spec's own rules — sections, requirement ids, the carryover contract — are in §10 and are enforced against the spec's path, not the ticket's.
+20. Every entry in `lessons` resolves to a lesson id under the lessons layer. `lessons_waiver`, when set, matches `NO-LESSON (<reason>)` exactly, and never coexists with a non-empty `lessons`.
+21. `status in {verify, done}` ⟹ `lessons` is non-empty **or** `lessons_waiver` is set, unless `policy.require_lessons` is false. One gate later than §15 on purpose: `review` is where the engineer hands over and `qa` judges, and the lesson is part of that judgement rather than a condition of entering it. See §11.
+22. The spec's own rules — sections, requirement ids, the carryover contract — are in §10 and are enforced against the spec's path, not the ticket's.
 
 ## 7. INDEX.md
 
@@ -355,3 +360,35 @@ reported as a `WARN` and is an explicit talking point at gate 4.
 Rules 1–10 are implemented in `validate_specs()` in
 `.claude/scripts/agile.py`. When the script and this section disagree, the
 script wins and this section is the bug.
+
+## 11. The tie to the lessons layer
+
+`docs/knowledge/` records what we know about the product. `docs/lessons/`
+records what we know about **working on it** — one imperative line per rule,
+filed when a ticket bounced off a gate. The convention is
+[`../lessons/README.md`](../lessons/README.md); the procedure is the
+`agile-lessons` skill. Three things bind it to the tracker:
+
+1. **A ticket carries what it taught.** `lessons: [LESSON-0003]` names the rules
+   this ticket produced or confirmed; `lessons_waiver: NO-LESSON (<reason>)`
+   says out loud that it taught nothing. Invariants 20 and 21 enforce both.
+2. **The waiver is the usual answer, and the bounce is the exception.** Most
+   tickets run straight through and record nothing. A ticket that went backwards
+   — `review -> in_progress`, `in_progress -> writing_tests`,
+   `writing_tests -> speccing`, `speccing -> todo` — produced the only evidence
+   this harness generates that the *process* failed rather than the code. `qa`
+   does not accept a waiver from one of those without an argument.
+3. **Whoever takes the failure edge files the lesson, at the moment they take
+   it.** Not at gate 5. By then the reason has decayed into one line of
+   `## Log`, and a lesson reconstructed from a log entry is a guess. A
+   `PostToolUse` hook says so on the edit itself.
+
+Confirming an existing rule (`lessons.py confirm <ID> --ticket <ID>`) satisfies
+the invariant exactly as filing a new one does, and is the better answer
+whenever a rule already says it: `confirmations` is the ranking key that decides
+which rules fit inside the hand-off budget, so splitting the evidence across two
+near-duplicates sinks both.
+
+`policy.require_lessons: false` turns invariant 21 off. `forge upgrade` sets it
+on a project with tickets already in flight, for the same reason it does with
+`policy.spec_first`: a new gate must not turn a healthy board red overnight.

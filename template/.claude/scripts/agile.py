@@ -126,10 +126,23 @@ WORK_FIELDS = [
     "parent", "scope", "assignee", "claimed_at", "branch", "pr",
     "merge_sha", "blocked_by", "spec", "spec_waiver", "docs", "docs_waiver",
 ]
+# Not in WORK_FIELDS, and deliberately so: unlike `docs:`, which a groomer must
+# fill before anyone writes code, nothing can be known about what a ticket
+# taught until it is nearly closed. Requiring the field from birth would make
+# every ticket written before this gate existed fail `lint` for a field that
+# could not have been filled. Invariant 21 requires the *answer* at verify; the
+# field itself arrives with it.
+LESSON_FIELDS = {"lessons", "lessons_waiver"}
 
 # statuses by which the knowledge base must have been consulted and actualised
 DOCUMENTED_STATUSES = {"review", "verify", "done"}
 DOCS_WAIVER_RE = re.compile(r"^NO-DOCS \(.+\)$")
+# Statuses by which the ticket must say what it taught about working here. It
+# is one gate later than the knowledge base on purpose: `review` is where the
+# engineer hands over and qa judges, and the lesson is part of that judgement,
+# not a condition of entering it.
+LESSONED_STATUSES = {"verify", "done"}
+LESSONS_WAIVER_RE = re.compile(r"^NO-LESSON \(.+\)$")
 NO_TICKET_RE = re.compile(r"^NO-TICKET \(.+\)$")
 SPEC_WAIVER_RE = re.compile(r"^NO-SPEC \(.+\)$")
 REQ_RE = re.compile(r"^REQ-\d{4}$")
@@ -453,6 +466,31 @@ def _kb_notes(root: str) -> dict[str, list[str]]:
     return keys
 
 
+def _lesson_ids(root: str) -> set[str]:
+    """Every lesson id on disk. lessons.py owns the layer's own rules; this is
+    only enough to resolve a ticket's `lessons:` entry, and it reads the files
+    rather than importing lessons.py, which imports this module."""
+    base = forgecfg.load(root).lessons_dir()
+    ids: set[str] = set()
+    if not os.path.isdir(base):
+        return ids
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        for name in filenames:
+            if not name.endswith(".md") or name.startswith("."):
+                continue
+            try:
+                with open(os.path.join(dirpath, name), encoding="utf-8") as fh:
+                    head = fh.read(2048)
+            except OSError:
+                continue
+            for line in head.splitlines():
+                if line.startswith("id:"):
+                    ids.add(line.split(":", 1)[1].strip())
+                    break
+    return ids
+
+
 def validate(root: str, arts: list[Artifact], check_git: bool = True) -> list[Issue]:
     cfg = forgecfg.load(root)
     issues: list[Issue] = []
@@ -464,6 +502,7 @@ def validate(root: str, arts: list[Artifact], check_git: bool = True) -> list[Is
         issues.append(Issue(a.rel, field, msg, "WARN"))
 
     kb = _kb_notes(root)
+    lesson_ids = _lesson_ids(root)
     specs, spec_fatal = load_specs(root)
     spec_frontmatter = {str(s.fm.get("ticket") or ""): s.fm for s in specs}
     for msg in spec_fatal:
@@ -686,6 +725,27 @@ def validate(root: str, arts: list[Artifact], check_git: bool = True) -> list[Is
             err(a, "docs",
                 f"status '{a.status}' requires the knowledge-base notes this ticket read and "
                 "actualised, or docs_waiver: NO-DOCS (<reason>)")
+
+        # What the ticket taught about working here, as opposed to what it
+        # taught about the product. A ticket that bounced off a gate and closed
+        # without recording why has made the project pay for that bounce twice.
+        lessons = [str(x) for x in a.listfield("lessons")]
+        lwaiver = a.fm.get("lessons_waiver")
+        for entry in lessons:
+            if entry not in lesson_ids:
+                err(a, "lessons", f"'{entry}' does not resolve to a lesson under "
+                                  f"{cfg.lessons_rel}")
+        if lwaiver is not None and not LESSONS_WAIVER_RE.match(str(lwaiver)):
+            err(a, "lessons_waiver", "must read 'NO-LESSON (<reason>)' or be null")
+        if lessons and lwaiver is not None:
+            err(a, "lessons_waiver", "a waiver contradicts a filled lessons: - drop one")
+        if cfg.require_lessons and a.status in LESSONED_STATUSES \
+                and not lessons and lwaiver is None:
+            err(a, "lessons",
+                f"status '{a.status}' requires the lesson(s) this ticket produced or "
+                "confirmed, or lessons_waiver: NO-LESSON (<reason>). A ticket that ran "
+                "straight through is the usual case and the waiver says so; a ticket "
+                "that bounced off a gate is not, and the waiver has to survive qa.")
 
         # blocked_by
         for dep in a.listfield("blocked_by"):
@@ -1040,7 +1100,8 @@ GATES = {
         "exit": "every test qa wrote passes, every available check for {scope} "
                 "really ran, PR open, status review",
         "failure": "in_progress -> writing_tests: a test is genuinely wrong, "
-                   "argued in '## Log' - never edited",
+                   "argued in '## Log' - never edited, and `lessons.py new` "
+                   "records what the bounce cost",
         "waiver": "SKIPPED (<reason> - see TASK-000X) for a check that does not "
                   "exist here yet",
         "prohibitions": [
@@ -1078,7 +1139,8 @@ GATES = {
         "artifact": "an evidence line per REQ in '## Log'",
         "exit": "every agreed REQ proved by something you ran yourself, and the "
                 "test files unchanged since your red commit",
-        "failure": "review -> in_progress with the exact command and its output",
+        "failure": "review -> in_progress with the exact command and its output, "
+                   "and `lessons.py new` if the same rejection is worth preventing twice",
         "waiver": "SKIPPED (<reason> - see TASK-000X)",
         "prohibitions": [
             "write or edit production code, including a one-line fix that would "
@@ -1107,15 +1169,18 @@ GATES = {
         ],
     },
     5: {
-        "name": "documentation",
+        "name": "documentation and lessons",
         "owner": "qa",
         "status": "review",
         "entry": "gate 4 passed",
-        "artifact": "a verdict on the notes the engineer filed",
+        "artifact": "a verdict on the notes the engineer filed, and on what the "
+                    "ticket taught about working here",
         "exit": "every note resolves, is correctly typed, carries real evidence "
-                "and is cross-linked; `kb.py lint` clean",
+                "and is cross-linked; `lessons:` or an argued NO-LESSON waiver "
+                "on the ticket; `kb.py lint` and `lessons.py lint` clean",
         "failure": "review -> in_progress naming what is missing",
-        "waiver": "docs_waiver: NO-DOCS (<reason>), and it must survive scrutiny",
+        "waiver": "docs_waiver: NO-DOCS (<reason>) and lessons_waiver: "
+                  "NO-LESSON (<reason>), and both must survive scrutiny",
         "prohibitions": [
             "write the notes the engineer owed and then approve them. Filing is "
             "the engineer's job; judging is yours, and doing both destroys the "
@@ -1124,6 +1189,8 @@ GATES = {
             "defect or chose between approaches.",
             "accept a business rule filed as an overview - lint cannot see a "
             "misfiling, which is why you have to.",
+            "accept a NO-LESSON waiver on a ticket that bounced off a gate. The "
+            "bounce is the evidence that something here is learnable.",
             "move the ticket to verify before gate 6 has reported.",
         ],
         "steps": [
@@ -1131,6 +1198,11 @@ GATES = {
             "Judge each note: right type, real evidence, '## Related' linked both "
             "ways, ticket listed in `tickets:` with `updated:` bumped.",
             "Judge any NO-DOCS waiver as a claim, not a formality.",
+            "Did this ticket bounce? If it did, a lesson is owed: "
+            "`python3 .claude/scripts/lessons.py list` first - confirming an "
+            "existing rule with `lessons.py confirm <ID> --ticket {id}` beats "
+            "filing a near-duplicate. Then set `lessons:` on the ticket, or "
+            "argue NO-LESSON.",
             "Write the verdict into '## Log' - red output and green output "
             "together.",
             "Once gate 6 has reported: review -> verify, assignee qa. `verify` "

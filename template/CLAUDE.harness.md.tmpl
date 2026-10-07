@@ -3,12 +3,14 @@
 
 {{REPO_TABLE}}
 
-## Two records: the tracker and the knowledge base
+## Three records: the tracker, the knowledge base and the lessons
 
-`docs/agile/` is **what we are doing**. `docs/knowledge/` is **what we know**. A
-ticket is closed and forgotten; a note outlives it. Both are plain Markdown
-committed here, both have a generated `INDEX.md` you must never edit, and both
-have a validator that exits 2 when they drift.
+`docs/agile/` is **what we are doing**. `docs/knowledge/` is **what we know
+about the product**. `docs/lessons/` is **how work goes wrong here** — one
+imperative line per rule, filed when a ticket bounced off a gate. A ticket is
+closed and forgotten; a note and a rule outlive it. All three are plain Markdown
+committed here, all three have a generated `INDEX.md` you must never edit, and
+all three have a validator that exits 2 when they drift.
 
 `forge.json` is the third record: **what this project is shaped like** — its
 repositories, scopes, owning agents and runnable checks. Read it rather than
@@ -68,16 +70,33 @@ finding per note, under the right type, cross-linked in `## Related` in both
 directions. Where a note and the code disagree, **the code wins**: say so, and
 fix the note.
 {{KB_CALLOUT}}
+## Lessons are what the gates taught
+
+```bash
+python3 .claude/scripts/lessons.py for <agent>   # the rules that bind it, capped and ranked
+python3 .claude/scripts/lessons.py show <LESSON-NNNN>
+```
+
+Each rule is one line of at most 120 characters, and the hand-off is capped at
+`policy.lesson_budget` of them so that reading them stays cheaper than
+rediscovering them. A ticket that **bounced** — `review -> in_progress`,
+`in_progress -> writing_tests`, `writing_tests -> speccing`, `speccing -> todo`
+— owes one, filed by whoever took that edge at the moment they took it.
+Confirming an existing rule (`lessons.py confirm <ID> --ticket <ID>`) counts,
+and beats a near-duplicate. The specification is
+[`docs/lessons/README.md`](docs/lessons/README.md); the procedure is
+`.claude/skills/agile-lessons/SKILL.md`.
+
 Agents: {{AGENT_LIST}} in `.claude/agents/`. Their operating rules live in
-`.claude/skills/agile-{artifacts,grooming,git,dod}/` and
+`.claude/skills/agile-{artifacts,grooming,git,dod,lessons}/` and
 `.claude/skills/project-knowledge/`.
 
 ## Rules that are not negotiable
 
-- **Both `INDEX.md` files are generated.** Never edit `docs/agile/INDEX.md` or
-  `docs/knowledge/INDEX.md`. Change the ticket or the note and let
-  `agile.py index` / `kb.py index` regenerate them. A hook denies the write
-  anyway.
+- **Every `INDEX.md` is generated.** Never edit `docs/agile/INDEX.md`,
+  `docs/knowledge/INDEX.md` or `docs/lessons/INDEX.md`. Change the ticket, the
+  note or the lesson and let `agile.py index` / `kb.py index` /
+  `lessons.py index` regenerate them. A hook denies the write anyway.
 - **Every task and bug carries `spec:` and `docs:`.** A `PreToolUse` hook
   refuses a new ticket missing either, because those two fields are what make
   the grilling step and the consult step happen at all. `spec:` is
@@ -92,6 +111,12 @@ Agents: {{AGENT_LIST}} in `.claude/agents/`. Their operating rules live in
   misfiled or misnamed file under `docs/knowledge/`. `overview` is not the
   default type — a rule is a `business-rule`, an incident is `troubleshooting`,
   an external system is an `integration`.
+- **A ticket says what it taught before it closes.** At `verify` and `done`,
+  `lessons:` names the rule this ticket produced or confirmed, or
+  `lessons_waiver: NO-LESSON (<reason>)` says it taught nothing — the same idiom
+  as `NO-DOCS`. The waiver is the normal answer for a ticket that ran straight
+  through, and a rejection for one that bounced: that bounce is the only
+  evidence this harness produces that the *process* failed rather than the code.
 - **A task's `scope` is exactly one** of {{SCOPE_LIST}}. Anything spanning two
   is two tasks under one story.
 - **One active ticket per working tree**, counting `writing_tests` as active. A
@@ -146,6 +171,7 @@ Agents: {{AGENT_LIST}} in `.claude/agents/`. Their operating rules live in
 ```bash
 python3 .claude/scripts/agile.py lint     # exit 2 means the tracker is inconsistent
 python3 .claude/scripts/kb.py lint        # exit 2 means the knowledge base is inconsistent
+python3 .claude/scripts/lessons.py lint   # exit 2 means a rule drifted, duplicated or went stale
 python3 .claude/scripts/forge.py doctor   # exit 2 means the harness config drifted
 ```
 {{CREDIT}}

@@ -373,6 +373,62 @@ open(t, "w").write(text)
 PY2
 want 0 "an argued NO-TICKET clears it" -- python3 .claude/scripts/agile.py lint
 
+echo "== the lessons gate"
+# at verify, a ticket says what it taught or argues that it taught nothing
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace("status: review", "status: verify")
+open(t, "w").write(s)
+PY2
+OUT="$(python3 .claude/scripts/agile.py lint 2>&1)"; RC=$?
+[ "$RC" = 2 ] && printf '%s' "$OUT" | grep -q "NO-LESSON" \
+  && ok "verify with no lesson and no waiver is rejected" \
+  || { bad "the lessons gate did not fire"; printf '%s\n' "$OUT" | sed 's/^/       /'; }
+
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace(
+    "docs_waiver: null", "docs_waiver: null\nlessons: []\nlessons_waiver: no lesson here")
+open(t, "w").write(s)
+PY2
+python3 .claude/scripts/agile.py lint 2>&1 | grep -q "lessons_waiver" \
+  && ok "a waiver that is not NO-LESSON (<reason>) is rejected" \
+  || bad "the waiver wording is not enforced"
+
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace(
+    "lessons_waiver: no lesson here", "lessons_waiver: NO-LESSON (ran clean)")
+open(t, "w").write(s)
+PY2
+want 0 "an argued NO-LESSON clears it" -- python3 .claude/scripts/agile.py lint
+
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace(
+    "lessons: []\nlessons_waiver: NO-LESSON (ran clean)",
+    "lessons: [LESSON-0404]\nlessons_waiver: null")
+open(t, "w").write(s)
+PY2
+python3 .claude/scripts/agile.py lint 2>&1 | grep -q "LESSON-0404" \
+  && ok "a lessons: entry that resolves to nothing is rejected" \
+  || bad "an unresolvable lesson id was accepted"
+
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace("lessons: [LESSON-0404]", "lessons: [LESSON-0002]")
+open(t, "w").write(s)
+PY2
+want 0 "a resolvable lesson satisfies the gate" -- python3 .claude/scripts/agile.py lint
+python3 - <<'PY2'
+t = "docs/agile/tasks/TASK-0001-first-task.md"
+s = open(t).read().replace("status: verify", "status: review")
+s = s.replace("lessons: [LESSON-0002]\nlessons_waiver: null",
+              "lessons: [LESSON-0002]\nlessons_waiver: null")
+open(t, "w").write(s)
+PY2
+want 0 "the ticket lints clean back at review" -- python3 .claude/scripts/agile.py lint
+
 echo "== the role agents are rendered"
 for a in pm qa qa-spec; do
   [ -f ".claude/agents/$a.md" ] && ok "$a is rendered" || bad "$a is missing"
@@ -429,6 +485,17 @@ hook() { printf '%s' "$2" | python3 ".claude/scripts/$1" >/dev/null 2>&1; echo $
   || bad "guard-kb allowed an orphan spec"
 [ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/specs/TASK-0001.md"}}')" = 0 ] \
   && ok "guard-kb allows a real spec" || bad "guard-kb blocked a real spec"
+BOUNCE='{"tool_input":{"file_path":"docs/agile/tasks/TASK-0001-first-task.md","old_string":"status: review","new_string":"status: in_progress"}}'
+[ "$(hook lesson-nudge.py "$BOUNCE")" = 2 ] \
+  && ok "lesson-nudge fires on a bounce" || bad "lesson-nudge missed a bounce"
+printf '%s' "$BOUNCE" | python3 .claude/scripts/lesson-nudge.py 2>&1 | grep -q "lessons.py confirm" \
+  && ok "the nudge offers confirming before filing" || bad "the nudge does not mention confirm"
+FORWARD='{"tool_input":{"file_path":"docs/agile/tasks/TASK-0001-first-task.md","old_string":"status: in_progress","new_string":"status: review"}}'
+[ "$(hook lesson-nudge.py "$FORWARD")" = 0 ] \
+  && ok "lesson-nudge is silent on a forward move" || bad "lesson-nudge fired on a forward move"
+ELSEWHERE='{"tool_input":{"file_path":"README.md","old_string":"status: review","new_string":"status: todo"}}'
+[ "$(hook lesson-nudge.py "$ELSEWHERE")" = 0 ] \
+  && ok "lesson-nudge ignores a file that is not a ticket" || bad "lesson-nudge fired outside the tracker"
 
 echo "== upgrading a board that predates the spec gate"
 OLD="$WORK/../forge-smoke-legacy-$$"
@@ -475,12 +542,19 @@ EOT
 import json
 c = json.load(open("forge.json"))
 c["policy"].pop("spec_first", None)      # as an older forge.json would be
+for k in ("require_lessons", "lesson_budget", "lesson_stale_days"):
+    c["policy"].pop(k, None)
 json.dump(c, open("forge.json", "w"), indent=2)
 PY2
   "$FORGE/bin/forge" upgrade . >/dev/null 2>&1
   SF="$(python3 -c 'import json;print(json.load(open("forge.json"))["policy"]["spec_first"])')"
   [ "$SF" = "False" ] && ok "upgrade leaves the gate off while tickets are in flight" \
     || bad "upgrade turned the spec gate on under a live board (spec_first=$SF)"
+  RL="$(python3 -c 'import json;print(json.load(open("forge.json"))["policy"]["require_lessons"])')"
+  [ "$RL" = "False" ] && ok "upgrade leaves the lessons gate off while tickets are in flight" \
+    || bad "upgrade turned the lessons gate on under a live board (require_lessons=$RL)"
+  [ -f docs/lessons/README.md ] && ok "upgrade installs the lessons convention" \
+    || bad "upgrade did not create docs/lessons/"
   OUT="$(python3 .claude/scripts/agile.py lint 2>&1)"; RC=$?
   [ "$RC" != 1 ] && ! printf '%s' "$OUT" | grep -q "ERROR" \
     && ok "a pre-gate board still lints without errors" \

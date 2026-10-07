@@ -9,6 +9,11 @@ This file is the authoritative specification of the convention.
 `agile.py lint` does for the tracker. If the two disagree, the script wins and
 this file is the bug.
 
+> **A rule about working here is not a note.** It goes to
+> [`../lessons/README.md`](../lessons/README.md) — one imperative line, handed
+> to the agent whose gate it binds. This tree is for what is true of the
+> product, not of the process.
+
 > **Source code remains the ultimate source of truth.** When a note and the code
 > disagree, the code is right, the note is stale, and fixing the note is part of
 > whatever task discovered the discrepancy.

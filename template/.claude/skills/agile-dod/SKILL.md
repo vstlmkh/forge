@@ -1,6 +1,6 @@
 ---
 name: agile-dod
-description: The Definition of Done — the six gates a ticket passes through (the brief, the red tests, the implementation, validation, documentation and the board), where the per-scope matrix of runnable checks lives, and what to do when a check, a test or an answer is unavailable. Load before specifying a ticket, before writing tests, before declaring yourself ready for review, and before verifying.
+description: The Definition of Done — the six gates a ticket passes through (the brief, the red tests, the implementation, validation, documentation and lessons, and the board), where the per-scope matrix of runnable checks lives, and what to do when a check, a test or an answer is unavailable. Load before specifying a ticket, before writing tests, before declaring yourself ready for review, and before verifying.
 ---
 
 # Definition of Done
@@ -36,7 +36,7 @@ python3 .claude/scripts/agile.py handoff <TICKET-ID> --gate <N>
 | G2 | writing the tests | `writing_tests` | `qa` | a test that was never red |
 | G3 | red to green | `in_progress` | the scope's engineer | a green suite that was edited into greenness |
 | G4 | validation | `review` | `qa` | a criterion that is merely plausible from the diff |
-| G5 | documentation | `review` | `qa` | the next agent re-deriving what this one learned |
+| G5 | documentation and lessons | `review` | `qa` | the next agent re-deriving what this one learned, or repeating the bounce that taught it |
 | G6 | board update | `review` | `pm` | deferred work quietly disappearing |
 
 G5 and G6 run in parallel after G4, and they write disjoint files: G5 writes the
@@ -240,7 +240,7 @@ A ticket may clear gate 4 only when **all** of these hold. QA checks them;
     is what keeps the weakness visible to the user at `verify` instead of
     invisible. `lint` already reports it as a `WARN`; do not pass it in silence.
 
-## Gate 5 — documentation — the knowledge half of `review`
+## Gate 5 — documentation and lessons — the knowledge half of `review`
 
 13. **The knowledge the work revealed is filed, correctly.** This is the
     documentation half of the gate, and it is judged the way the tests are:
@@ -262,12 +262,21 @@ A ticket may clear gate 4 only when **all** of these hold. QA checks them;
     or chose between approaches — that work always leaves something a future
     agent needs. "No time to document" is not a reason; it is the gap the waiver
     exists to make visible.
-15. **`python3 .claude/scripts/agile.py lint` and
-    `python3 .claude/scripts/kb.py lint` both exit 0.**
+15. **What the ticket taught about working here is recorded.** `lessons:` names
+    the rule it produced or confirmed, or `lessons_waiver: NO-LESSON (<reason>)`
+    says it taught nothing. The waiver is the normal answer for a ticket that
+    ran straight through — and a rejection on a ticket that went backwards at
+    any gate, because that bounce is the evidence something here is learnable.
+    Confirming an existing rule counts, and is better than a near-duplicate:
+    `python3 .claude/scripts/lessons.py list` before
+    `lessons.py new`. The procedure is in `agile-lessons`.
+16. **`python3 .claude/scripts/agile.py lint`,
+    `python3 .claude/scripts/kb.py lint` and
+    `python3 .claude/scripts/lessons.py lint` all exit 0.**
 
-`qa` does not write the notes the engineer owed and then approve them. Filing is
-the engineer's job; judging is QA's. Doing both destroys the separation the
-verdict rests on, exactly as writing the production code would.
+`qa` does not write the notes or the lesson the engineer owed and then approve
+them. Filing is the engineer's job; judging is QA's. Doing both destroys the
+separation the verdict rests on, exactly as writing the production code would.
 
 ## Gate 6 — the board — in parallel with gate 5
 

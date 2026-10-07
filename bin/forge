@@ -854,6 +854,48 @@ def adopt_spec_gate(target: str, cfg: dict, cfg_path: str) -> None:
         say("  policy.spec_first: true - every new ticket is specified before it is tested")
 
 
+def adopt_lessons_gate(target: str, cfg: dict, cfg_path: str) -> None:
+    """Decide how a project upgrading into the lessons gate adopts it.
+
+    Same reasoning as adopt_spec_gate, and the same answer: a board with
+    nothing in flight takes the gate immediately; a board mid-ticket takes it
+    off, loudly, because a ticket already at `verify` cannot retroactively
+    produce the lesson it never recorded."""
+    policy = cfg.setdefault("policy", {})
+    if "require_lessons" in policy:
+        return
+    tracker = (cfg.get("paths") or {}).get("tracker", "docs/agile").strip("/")
+    exposed = []
+    for sub in ("tasks", "bugs"):
+        d = os.path.join(target, *tracker.split("/"), sub)
+        if not os.path.isdir(d):
+            continue
+        for name in sorted(os.listdir(d)):
+            if not name.endswith(".md") or name.startswith("."):
+                continue
+            try:
+                with open(os.path.join(d, name), encoding="utf-8") as fh:
+                    head = fh.read(4096)
+            except OSError:
+                continue
+            for line in head.splitlines():
+                if line.startswith("status:"):
+                    if line.split(":", 1)[1].strip() in IN_FLIGHT:
+                        exposed.append(name)
+                    break
+    policy["require_lessons"] = not exposed
+    policy.setdefault("lesson_budget", 12)
+    policy.setdefault("lesson_stale_days", 180)
+    write_json(cfg_path, cfg)
+    if exposed:
+        say(f"  note: {len(exposed)} ticket(s) are in flight and predate the lessons gate.")
+        say("        policy.require_lessons is set to false so they can finish.")
+        say("        Set it to true in forge.json once they close; "
+            "`forge doctor` will remind you.")
+    else:
+        say("  policy.require_lessons: true - a ticket says what it taught before it closes")
+
+
 def cmd_upgrade(argv: list[str]) -> int:
     target = os.path.abspath(argv[0]) if argv and not argv[0].startswith("-") else os.getcwd()
     cfg_path = os.path.join(target, "forge.json")
@@ -863,6 +905,7 @@ def cmd_upgrade(argv: list[str]) -> int:
     say(f"refreshing the harness in {target} (forge.json and rendered agents are left alone)")
     install_payload(target, force=True)
     adopt_spec_gate(target, cfg, cfg_path)
+    adopt_lessons_gate(target, cfg, cfg_path)
     merge_settings(target)
     if "--no-claude-md" not in argv:
         write_claude_md(target, cfg)

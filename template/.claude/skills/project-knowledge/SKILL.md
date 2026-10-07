@@ -5,6 +5,13 @@ description: How the agents use the project knowledge base — consulting it bef
 
 # The project knowledge base
 
+> **A rule about how to work here is not a note.** "The load balancer drops an
+> instance that answers anything but 200" is true of the system and belongs
+> here. "Run every available check before asking for review" is true of working
+> on it and belongs in the lessons layer — `agile-lessons`, and
+> `docs/lessons/README.md`. Filing the second kind here hides it from everyone
+> who searches the knowledge base.
+
 The tracker is what we are doing. The knowledge base is what we know. This skill
 is the procedure; `docs/knowledge/README.md` is the specification — the eight
 types, the filename grammar, the frontmatter and the required sections. Read it
