@@ -29,7 +29,8 @@ CONFIG_NAME = "forge.json"
 FORGE_NAME = "forge"
 FORGE_URL = "https://github.com/vstlmkh/forge"
 
-DEFAULT_PATHS = {"tracker": "docs/agile", "kb": "docs/knowledge"}
+DEFAULT_PATHS = {"tracker": "docs/agile", "kb": "docs/knowledge",
+                 "lessons": "docs/lessons"}
 
 # The roles whose agent file carries a model. A project chooses the tier in
 # forge.json under policy.models; `forge agents` renders it in. The model is
@@ -57,6 +58,19 @@ KB_TYPES: dict[str, list[str]] = {
     "runbook": ["When to run this", "Steps", "If it goes wrong"],
     "data-model": ["Entities", "Invariants", "Relations"],
 }
+
+
+# The lessons layer. A lesson is addressed to an audience, not to a subject:
+# `scope` says which slice of the project it governs and `roles` which of the
+# three identities must obey it. Both axes accept the reserved value below,
+# which is why a project may not name a scope `all`.
+LESSON_ROLES = ("pm", "qa", "engineer")
+LESSON_ALL = "all"
+# What `lessons.py for` is allowed to put in front of an agent. The cap is the
+# whole point: an agent that is handed forty rules reads none of them, and the
+# context it spends on them is context it does not spend on the ticket.
+DEFAULT_LESSON_BUDGET = 12
+DEFAULT_LESSON_STALE_DAYS = 180
 
 
 class ConfigError(Exception):
@@ -140,6 +154,7 @@ class Config:
         paths = {**DEFAULT_PATHS, **(data.get("paths") or {})}
         self.tracker_rel = paths["tracker"].strip("/")
         self.kb_rel = paths["kb"].strip("/")
+        self.lessons_rel = paths["lessons"].strip("/")
 
         repos = data.get("repos") or {}
         if not repos:
@@ -184,6 +199,12 @@ class Config:
         # false only while a project upgraded mid-flight drains its board; see
         # SCHEMA.md §10 and `forge doctor`
         self.spec_first = bool(policy.get("spec_first", True))
+        # false only while a project upgraded mid-flight drains its board, for
+        # the same reason as spec_first above
+        self.require_lessons = bool(policy.get("require_lessons", True))
+        self.lesson_budget = int(policy.get("lesson_budget", DEFAULT_LESSON_BUDGET))
+        self.lesson_stale_days = int(policy.get("lesson_stale_days",
+                                                DEFAULT_LESSON_STALE_DAYS))
         self.models = dict(policy.get("models") or {})
 
     def model_for(self, role: str) -> str:
@@ -250,6 +271,29 @@ class Config:
     def kb_dir(self) -> str:
         return os.path.join(self.root, *self.kb_rel.split("/"))
 
+    def lessons_dir(self) -> str:
+        return os.path.join(self.root, *self.lessons_rel.split("/"))
+
+    def lesson_scopes(self) -> list[str]:
+        """Where a lesson may be filed: any tracker scope, or every scope."""
+        return list(self.scopes) + [LESSON_ALL]
+
+    def role_of_agent(self, agent: str) -> str:
+        """Which of the three identities an agent file speaks for. A delegate
+        inherits its principal's role, exactly as it inherits its `assignee`."""
+        agent = AGENT_ALIASES.get(agent, agent)
+        if agent in ("pm", "qa"):
+            return agent
+        return "engineer"
+
+    def scope_of_agent(self, agent: str) -> str | None:
+        """The scope an agent owns, or None for pm and qa, who own them all."""
+        agent = AGENT_ALIASES.get(agent, agent)
+        for name, s in self.scopes.items():
+            if agent in s.agents:
+                return name
+        return None
+
     # ---- self-validation ---------------------------------------------------
 
     def problems(self) -> list[str]:
@@ -296,6 +340,19 @@ class Config:
                            f"({', '.join(MODEL_ROLES)})")
         if not os.path.isdir(self.kb_dir()):
             out.append(f"paths.kb: {self.kb_rel}/ does not exist")
+        if LESSON_ALL in self.scopes:
+            out.append(f"scopes.{LESSON_ALL}: '{LESSON_ALL}' is reserved - a lesson filed "
+                       "there addresses every scope, so no scope may be called that")
+        if not os.path.isdir(self.lessons_dir()):
+            out.append(f"paths.lessons: {self.lessons_rel}/ does not exist - "
+                       "run `forge upgrade` to create it")
+        if self.lesson_budget < 1:
+            out.append("policy.lesson_budget: must be at least 1 - set "
+                       "policy.require_lessons false to switch the layer off instead")
+        if not self.require_lessons:
+            out.append("policy.require_lessons: off - a ticket may close without "
+                       "recording what it taught. Turn it on once the board "
+                       "predating the gate has drained.")
         return out
 
 

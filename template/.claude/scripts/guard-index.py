@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: the two INDEX.md files are generated, never hand-edited.
+"""PreToolUse guard: the generated INDEX.md files are never hand-edited.
 
 Reads the Claude Code PreToolUse payload on stdin and denies any file-writing
-tool whose target resolves to the tracker's or the knowledge base's INDEX.md.
-Both paths come from forge.json, so a project that moved them is still covered.
+tool whose target resolves to the INDEX.md of the tracker, the knowledge base or
+the lessons. Every path comes from forge.json, so a project that moved one is
+still covered.
 
 Exit codes: 0 allow, 2 deny (stderr is fed back to the model).
 """
@@ -35,6 +36,11 @@ def main() -> int:
                 f"{cfg.kb_rel}/INDEX.md is generated from the notes' frontmatter and must "
                 "never be edited by hand. Change the note instead, then run "
                 "`python3 .claude/scripts/kb.py index`."
+            ),
+            f"{cfg.lessons_rel}/INDEX.md": (
+                f"{cfg.lessons_rel}/INDEX.md is generated from the lessons' frontmatter and "
+                "must never be edited by hand. Change the lesson instead, then run "
+                "`python3 .claude/scripts/lessons.py index`."
             ),
         }
     except Exception:

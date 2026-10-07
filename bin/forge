@@ -63,6 +63,7 @@ PAYLOAD = [
     ("docs/agile/README.md", "docs/agile/README.md"),
     ("docs/agile/SCHEMA.md", "docs/agile/SCHEMA.md"),
     ("docs/knowledge/README.md", "docs/knowledge/README.md"),
+    ("docs/lessons/README.md", "docs/lessons/README.md"),
 ]
 # The role agents that exist in every project, and the template each is
 # rendered from. They carry one substitution - the model tier - which a project
@@ -371,13 +372,16 @@ def assemble(project: str, repos: dict, scopes: dict, checks: dict,
          "command": "python3 .claude/scripts/agile.py lint", "available": True},
         {"id": "kb", "title": "Knowledge-base integrity",
          "command": "python3 .claude/scripts/kb.py lint", "available": True},
+        {"id": "lessons", "title": "Lessons integrity",
+         "command": "python3 .claude/scripts/lessons.py lint", "available": True},
     ]
     return {
         "forge_version": VERSION,
         "generator": {"name": FORGE_NAME, "url": FORGE_URL, "version": VERSION},
         "attribution": ATTRIBUTION[0],
         "project": {"name": project, "description": ""},
-        "paths": {"tracker": "docs/agile", "kb": "docs/knowledge"},
+        "paths": {"tracker": "docs/agile", "kb": "docs/knowledge",
+                  "lessons": "docs/lessons"},
         "repos": repos,
         "scopes": scopes,
         "checks": checks,
@@ -396,7 +400,8 @@ def assemble(project: str, repos: dict, scopes: dict, checks: dict,
             "never_commit": never,
         },
         "policy": {"test_first": True, "spec_first": True, "require_docs": True,
-                   "stale_claim_hours": 24},
+                   "require_lessons": True, "lesson_budget": 12,
+                   "lesson_stale_days": 180, "stale_claim_hours": 24},
     }
 
 
@@ -723,6 +728,7 @@ def install_payload(target: str, force: bool) -> None:
         if not os.listdir(d):
             open(keep, "a").close()
     os.makedirs(os.path.join(target, "docs", "knowledge"), exist_ok=True)
+    os.makedirs(os.path.join(target, "docs", "lessons"), exist_ok=True)
 
 
 def cmd_init(argv: list[str]) -> int:
@@ -786,6 +792,7 @@ def cmd_init(argv: list[str]) -> int:
     say("  python3 .claude/scripts/forge.py doctor     # does the config match the repo?")
     say("  python3 .claude/scripts/agile.py index      # create the empty board")
     say("  python3 .claude/scripts/kb.py index         # create the empty knowledge index")
+    say("  python3 .claude/scripts/lessons.py index    # create the empty lessons index")
     say("  /agile:groom \"<your first request>\"")
     return 0
 

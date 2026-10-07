@@ -53,6 +53,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/kb.py\" index >/dev/null 2>&1 || true",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/lessons.py\" index >/dev/null 2>&1 || true",
+            "timeout": 30
           }
         ]
       }
@@ -62,6 +67,7 @@
     "allow": [
       "Bash(python3 .claude/scripts/agile.py:*)",
       "Bash(python3 .claude/scripts/kb.py:*)",
+      "Bash(python3 .claude/scripts/lessons.py:*)",
       "Bash(python3 .claude/scripts/forge.py:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",

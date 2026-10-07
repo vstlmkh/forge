@@ -244,6 +244,109 @@ want 0 "for-ticket resolves the note" -- python3 .claude/scripts/kb.py for-ticke
 want 0 "find hits the note" -- python3 .claude/scripts/kb.py find health
 want 2 "find reports a gap as exit 2" -- python3 .claude/scripts/kb.py find nonexistentsubject
 
+echo "== lessons"
+[ -f docs/lessons/README.md ] && ok "init installs the lessons convention" \
+  || bad "docs/lessons/README.md missing"
+want 0 "lessons.py roles prints the vocabulary" -- python3 .claude/scripts/lessons.py roles
+python3 .claude/scripts/lessons.py for api-engineer | grep -q "none recorded yet" \
+  && ok "an empty layer costs one line" || bad "the empty hand-off is not silent"
+
+L1="$(python3 .claude/scripts/lessons.py new "migration check before pr" \
+      --scope api --roles engineer --gate 3 --ticket TASK-0001 \
+      --rule "Run every available check before asking for review, not after review asks." 2>/dev/null)"
+[ -n "$L1" ] && ok "lessons.py new created $L1" || bad "lessons.py new produced nothing"
+[ -f "docs/lessons/api/LESSON-0001 migration check before pr.md" ] \
+  && ok "the id leads the filename" || bad "the lesson is not where the convention says"
+want 2 "a skeleton body is rejected" -- python3 .claude/scripts/lessons.py lint
+
+python3 - <<'PY2'
+import glob
+p = glob.glob("docs/lessons/api/*.md")[0]
+s = open(p).read()
+for frag, real in [
+    ("_The failure this prevents", "The PR sat for a day while review ran the check the author had not."),
+    ("_What to do differently", "`forge.py checks <scope>`, every available row, before the PR is opened."),
+    ("_The ticket and the gate", "- TASK-0001, gate 3: review bounced it for an unrun check."),
+]:
+    line = next(l for l in s.splitlines() if l.startswith(frag))
+    s = s.replace(line, real)
+open(p, "w").write(s)
+PY2
+want 0 "a filled lesson lints clean" -- python3 .claude/scripts/lessons.py lint
+python3 .claude/scripts/lessons.py for api-engineer | grep -q "LESSON-0001" \
+  && ok "the engineer is handed its scope's rule" || bad "the hand-off missed the rule"
+python3 .claude/scripts/lessons.py for pm | grep -q "none recorded yet" \
+  && ok "a rule addressed to engineers does not reach pm" || bad "roles are not filtered"
+python3 .claude/scripts/lessons.py for qa --scope api | grep -q "none recorded yet" \
+  && ok "roles filter independently of scope" || bad "qa was handed an engineer rule"
+
+L2="$(python3 .claude/scripts/lessons.py new "waiver wording" --scope all --roles all \
+      --rule "Record a skipped check as SKIPPED with its reason and ticket, never as a pass." \
+      --ticket TASK-0001 2>/dev/null)"
+python3 - <<'PY2'
+import glob
+p = [x for x in glob.glob("docs/lessons/all/*.md")][0]
+s = open(p).read()
+for frag, real in [
+    ("_The failure this prevents", "A silently omitted row reads as a pass and the gate stops meaning anything."),
+    ("_What to do differently", "Write `SKIPPED (<reason> - see TASK-000X)` in the verdict."),
+    ("_The ticket and the gate", "- TASK-0001, gate 5: a row was omitted rather than recorded."),
+]:
+    line = next(l for l in s.splitlines() if l.startswith(frag))
+    s = s.replace(line, real)
+open(p, "w").write(s)
+PY2
+want 0 "two lessons lint clean" -- python3 .claude/scripts/lessons.py lint
+[ "$(python3 .claude/scripts/lessons.py for api-engineer | grep -c '^  LESSON-')" = 2 ] \
+  && ok "scope 'all' reaches every engineer" || bad "the 'all' scope did not reach the engineer"
+OUT="$(python3 .claude/scripts/lessons.py for api-engineer --budget 1)"
+printf '%s' "$OUT" | grep -q "withheld" \
+  && ok "the budget caps the hand-off and says what it withheld" \
+  || bad "the budget truncated in silence"
+[ "$(printf '%s' "$OUT" | grep -c '^  LESSON-')" = 1 ] \
+  && ok "the budget is a hard cap" || bad "the budget did not cap"
+
+want 0 "confirm bumps the counter" -- python3 .claude/scripts/lessons.py confirm LESSON-0002
+grep -q "confirmations: 1" docs/lessons/all/*.md \
+  && ok "the confirmation is written back" || bad "confirm did not persist"
+[ "$(python3 .claude/scripts/lessons.py for api-engineer --budget 1 | grep '^  LESSON-')" \
+  = "$(printf '  LESSON-0002  Record a skipped check as SKIPPED with its reason and ticket, never as a pass.')" ] \
+  && ok "a confirmed rule outranks an unconfirmed one" || bad "confirmations do not rank"
+
+want 1 "a rule may not supersede itself" -- \
+  python3 .claude/scripts/lessons.py supersede LESSON-0001 --by LESSON-0001
+want 0 "supersede records the replacement" -- \
+  python3 .claude/scripts/lessons.py supersede LESSON-0001 --by LESSON-0002
+python3 .claude/scripts/lessons.py for api-engineer | grep -q "LESSON-0001" \
+  && bad "a superseded rule is still handed out" || ok "a superseded rule leaves the hand-off"
+want 0 "the layer lints clean after supersession" -- python3 .claude/scripts/lessons.py lint
+
+# the two limits that keep this layer affordable
+python3 - <<'PY2'
+import glob
+p = glob.glob("docs/lessons/all/*.md")[0]
+s = open(p).read()
+old = next(l for l in s.splitlines() if l.startswith("rule: "))
+open(p, "w").write(s.replace(old, "rule: " + "x" * 130))
+PY2
+OUT="$(python3 .claude/scripts/lessons.py lint 2>&1)"
+printf '%s' "$OUT" | grep -q "rule" \
+  && ok "a rule that does not fit on a line is rejected" || bad "the rule limit does not fire"
+python3 - <<'PY2'
+import glob
+p = glob.glob("docs/lessons/all/*.md")[0]
+s = open(p).read()
+old = next(l for l in s.splitlines() if l.startswith("rule: "))
+open(p, "w").write(s.replace(old,
+    "rule: Record a skipped check as SKIPPED with its reason and ticket, never as a pass."))
+PY2
+
+want 0 "lessons index writes" -- python3 .claude/scripts/lessons.py index
+cp docs/lessons/INDEX.md /tmp/forge-lessons-a
+python3 .claude/scripts/lessons.py index >/dev/null
+cmp -s /tmp/forge-lessons-a docs/lessons/INDEX.md && ok "lessons index is byte-stable" \
+  || bad "lessons index is not byte-stable"
+
 echo "== the carryover gate"
 # at verify, every deferred requirement must have become a ticket or an argument
 python3 - <<'PY2'
@@ -307,6 +410,8 @@ echo "== hooks"
 hook() { printf '%s' "$2" | python3 ".claude/scripts/$1" >/dev/null 2>&1; echo $?; }
 [ "$(hook guard-index.py '{"tool_input":{"file_path":"docs/agile/INDEX.md"}}')" = 2 ] \
   && ok "guard-index denies editing the board" || bad "guard-index let the board through"
+[ "$(hook guard-index.py '{"tool_input":{"file_path":"docs/lessons/INDEX.md"}}')" = 2 ] \
+  && ok "guard-index denies editing the lessons index" || bad "guard-index let the lessons index through"
 [ "$(hook guard-index.py '{"tool_input":{"file_path":"docs/agile/tasks/TASK-0001-first-task.md"}}')" = 0 ] \
   && ok "guard-index allows a ticket" || bad "guard-index blocked a ticket"
 [ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/knowledge/api/business-rule/notes.md"}}')" = 2 ] \
