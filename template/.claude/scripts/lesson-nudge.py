@@ -8,7 +8,7 @@ where `lessons:` is required, whoever bounced has moved on and the reason has
 decayed into one line of '## Log'.
 
 So this fires on the edit itself. It reads the transition out of the edit's own
-before/after strings, which the compare-and-swap protocol in `agile-artifacts`
+before/after strings, which the compare-and-swap protocol in `agile-claims`
 guarantees are there, and says what is owed. It never blocks: a bounce is
 correct behaviour, and the lesson is the point, not the permission.
 

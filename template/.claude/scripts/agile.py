@@ -15,9 +15,11 @@ Commands
     spec new <ID>               scaffold <tracker>/specs/<ID>.md
     spec show <ID>              print JSON {path, frontmatter, brief, questions, carryover}
     spec check <ID>             validate one spec
+    spec answer <ID> Q1=...     write the user's answers into '## Questions'
     next-req <ID>               print the next free REQ id for that ticket
     gates [N]                   print the gate contract(s)
     handoff <ID> --gate <N>     print the dispatch payload for that gate
+    handback <ID> --gate <N>    check that gate's exit condition mechanically
 
 Exit codes
     0  clean
@@ -1042,7 +1044,7 @@ GATES = {
         ],
         "steps": [
             "Claim it: status speccing, assignee qa, claimed_at - with the "
-            "compare-and-swap edit from `agile-artifacts`. If the edit fails you "
+            "compare-and-swap edit from `agile-claims`. If the edit fails you "
             "lost the race: stop and report.",
             "`python3 .claude/scripts/agile.py spec new {id}`, then set the "
             "printed `spec:` value on the ticket.",
@@ -1052,8 +1054,15 @@ GATES = {
             "Write '## Brief', allocating ids with "
             "`python3 .claude/scripts/agile.py next-req {id}`.",
             "Everything still open goes into '## Questions' with the REQ it "
-            "blocks. Set the spec's status to 'questions' and stop - the "
-            "top-level session puts them to the user in one batch.",
+            "blocks, one row per question, numbered Q1, Q2, ... Set the spec's "
+            "status to 'questions' and stop - the top-level session asks the "
+            "user in one batch and writes the answers back with "
+            "`agile.py spec answer {id} Q1=\"...\"`.",
+            "When you are dispatched again, the answers are in the "
+            "'spec ## Questions' block above, taken from the file rather than "
+            "retyped. An answer reading 'DEFERRED - ...' is a carryover row, "
+            "not an assumption; a question still showing '(still open)' is not "
+            "yours to answer.",
             "With the answers: finish '## Brief', move anything deferred into "
             "'## Carryover', write '## Spec' and '## Plan', set the spec "
             "'agreed'.",
@@ -1116,6 +1125,9 @@ GATES = {
             "report a check as passing when it did not run, or move past review.",
         ],
         "steps": [
+            "If '## Log' above opens with a 'REJECTED G4:' or 'REJECTED G5:' "
+            "entry, this is a second round: that entry is the whole brief for "
+            "it. Reproduce the command it names before you change anything.",
             "Check out {branch}. Do not cut one.",
             "Run the tests and watch them fail. That failure is the brief in "
             "executable form.",
@@ -1139,8 +1151,12 @@ GATES = {
         "artifact": "an evidence line per REQ in '## Log'",
         "exit": "every agreed REQ proved by something you ran yourself, and the "
                 "test files unchanged since your red commit",
-        "failure": "review -> in_progress with the exact command and its output, "
-                   "and `lessons.py new` if the same rejection is worth preventing twice",
+        "failure": "review -> in_progress with a '## Log' entry opening "
+                   "'REJECTED G4:' that carries the exact command, its output and "
+                   "the REQ it blocks - the next dispatch is a plain `handoff "
+                   "--gate 3` and reads it from there, so anything you leave out "
+                   "of the ticket does not reach the engineer. `lessons.py new` "
+                   "if the same rejection is worth preventing twice",
         "waiver": "SKIPPED (<reason> - see TASK-000X)",
         "prohibitions": [
             "write or edit production code, including a one-line fix that would "
@@ -1166,6 +1182,11 @@ GATES = {
             "Judge the 'assumed' rows in the brief as well as the diff.",
             "For a bug: '## Root cause' filled, and the original reproduction no "
             "longer reproduces.",
+            "If you reject: write the finding into '## Log' as one entry opening "
+            "'REJECTED G4:' - the command, its real output, and the REQ it "
+            "blocks. The engineer is re-dispatched with `handoff --gate 3`, which "
+            "carries the last few log entries and nothing else. A finding you "
+            "report only to the orchestrator does not survive the trip.",
         ],
     },
     5: {
@@ -1178,7 +1199,10 @@ GATES = {
         "exit": "every note resolves, is correctly typed, carries real evidence "
                 "and is cross-linked; `lessons:` or an argued NO-LESSON waiver "
                 "on the ticket; `kb.py lint` and `lessons.py lint` clean",
-        "failure": "review -> in_progress naming what is missing",
+        "failure": "review -> in_progress with a '## Log' entry opening "
+                   "'REJECTED G5:' naming what is missing. The orchestrator "
+                   "re-dispatches with `handoff --gate 3` and relays nothing by "
+                   "hand, so what is not in the ticket is lost",
         "waiver": "docs_waiver: NO-DOCS (<reason>) and lessons_waiver: "
                   "NO-LESSON (<reason>), and both must survive scrutiny",
         "prohibitions": [
@@ -1204,7 +1228,9 @@ GATES = {
             "filing a near-duplicate. Then set `lessons:` on the ticket, or "
             "argue NO-LESSON.",
             "Write the verdict into '## Log' - red output and green output "
-            "together.",
+            "together. A rejection here is one entry opening 'REJECTED G5:', "
+            "naming the note or the lesson that is missing; the re-dispatch "
+            "reads the ticket, not the orchestrator's summary of it.",
             "Once gate 6 has reported: review -> verify, assignee qa. `verify` "
             "means it awaits the user's acceptance; you do not close it.",
         ],
@@ -1556,8 +1582,9 @@ def cmd_spec(root: str, arts: list[Artifact], args: list[str]) -> int:
         print("fatal: spec needs new|show|check and an id", file=sys.stderr)
         return 1
     sub, rest = args[0], args[1:]
-    if sub not in ("new", "show", "check") or not rest:
-        print("fatal: usage: spec new|show|check <ID>", file=sys.stderr)
+    if sub not in ("new", "show", "check", "answer") or not rest:
+        print("fatal: usage: spec new|show|check <ID> | spec answer <ID> Q1=\"<answer>\"",
+              file=sys.stderr)
         return 1
     ident = rest[0]
     holder = next((a for a in arts if a.id == ident), None)
@@ -1592,6 +1619,23 @@ def cmd_spec(root: str, arts: list[Artifact], args: list[str]) -> int:
         print(f"fatal: no spec at {spec_rel(ident)}", file=sys.stderr)
         return 1
 
+    if sub == "answer":
+        pairs = []
+        for arg in rest[1:]:
+            if "=" not in arg:
+                print(f"fatal: '{arg}' is not Q<N>=\"<answer>\"", file=sys.stderr)
+                return 1
+            q, _, text = arg.partition("=")
+            if not text.strip():
+                print(f"fatal: {q} has an empty answer - a deferral is written "
+                      f"{q}=\"DEFERRED - <reason>\", never left blank", file=sys.stderr)
+                return 1
+            pairs.append((q, text))
+        if not pairs:
+            print("fatal: spec answer needs at least one Q<N>=\"<answer>\"", file=sys.stderr)
+            return 1
+        return cmd_spec_answer(root, s, pairs)
+
     if sub == "show":
         print(json.dumps({
             "path": s.rel,
@@ -1623,6 +1667,80 @@ def cmd_spec(root: str, arts: list[Artifact], args: list[str]) -> int:
     for i in issues:
         print(i)
     return 2 if any(i.level == "ERROR" for i in issues) else 0
+
+
+def _cell(text: str) -> str:
+    """Fit the user's own words into one table cell. A pipe would split the row
+    and shift every later column without anything noticing, and a newline would
+    end the table early - so both are neutralised rather than rejected."""
+    return " ".join(text.replace("|", "\\|").split()).strip()
+
+
+def cmd_spec_answer(root: str, s: Artifact, pairs: list[tuple[str, str]]) -> int:
+    """Write the user's answers straight into '## Questions'.
+
+    Gate 1 is the one place where something the repository cannot reconstruct -
+    the user's own words - passes through the orchestrator. Relayed in the next
+    dispatch prompt it survives exactly as long as that context does; written
+    here it is in git, and the gate 1 payload renders it back for whoever picks
+    the ticket up. Nothing else in the spec is touched: the brief, the carryover
+    and the status are qa's to write.
+    """
+    with open(s.path, encoding="utf-8") as fh:
+        lines = fh.read().split("\n")
+
+    fm_end = 0
+    if lines and lines[0].strip() == "---":
+        for i, line in enumerate(lines[1:], 1):
+            if line.strip() == "---":
+                fm_end = i
+                break
+
+    wanted = {q.strip().upper(): a for q, a in pairs}
+    written: list[str] = []
+    inside = False
+    for i, line in enumerate(lines):
+        if i < fm_end:
+            if line.startswith("updated:"):
+                lines[i] = "updated: " + datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            continue
+        if line.startswith("## "):
+            inside = line.strip() == "## Questions"
+            continue
+        if not inside or not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not cells or cells[0].upper() not in wanted:
+            continue
+        while len(cells) < 4:
+            cells.append("")
+        cells[3] = _cell(wanted[cells[0].upper()])
+        lines[i] = "| " + " | ".join(cells) + " |"
+        written.append(cells[0].upper())
+
+    # A question id that matched nothing is the failure this command exists to
+    # prevent: the answer would be silently dropped, which is exactly what the
+    # free-text relay already did.
+    missing = sorted(set(wanted) - set(written))
+    if missing:
+        print(f"fatal: {s.rel} has no question(s) {', '.join(missing)} - "
+              f"`agile.py spec show {s.fm.get('id')}` lists the ids it does have",
+              file=sys.stderr)
+        return 1
+
+    with open(s.path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+
+    open_rows = [r[0] for r in table_rows(section_of("\n".join(lines), "Questions") or "")
+                 if r and not is_placeholder(r[0])
+                 and (len(r) < 4 or is_placeholder(r[3]))]
+    print(f"{s.rel}: answered {', '.join(written)}")
+    if open_rows:
+        print(f"still open: {', '.join(open_rows)}")
+    else:
+        print("every question is answered - qa may finish the brief and set the "
+              "spec 'agreed'")
+    return 0
 
 
 def cmd_next_req(root: str, ident: str) -> int:
@@ -1714,6 +1832,40 @@ def _log_tail(a: Artifact, keep: int) -> tuple[str, int, int]:
     return "\n".join(tail), len(tail), total
 
 
+def _lesson_block(root: str, owner: str) -> list[str]:
+    """The rules binding this gate's owner, rendered into the payload.
+
+    They used to be a line in the agent's own file telling it to run
+    `lessons.py for <agent>` - an instruction, which is to say something an
+    agent may skip, plus a tool round-trip on every gate. Rendered here they
+    are unskippable and cost less, and the cap that makes the layer affordable
+    is the same one `lessons.py for` applies: the ranking and the budget live
+    there, not here.
+
+    Silent when the layer is absent or unreadable. A project that has recorded
+    nothing yet is the normal case, not an error.
+    """
+    try:
+        import lessons as lessonlayer
+        shown, withheld, _audience = lessonlayer.rules_for(root, owner)
+    except Exception:
+        return []
+    if not shown:
+        return []
+    out = ["", "THIS PROJECT HAS LEARNED (obey these the way you obey the contract above):"]
+    for l in shown:
+        out.append(f"  {l.id}  {l.rule}")
+    if withheld:
+        # The count is the part that must never be dropped: a capped list that
+        # hides its own truncation reads as the whole of what the project knows.
+        out.append(f"  ({len(withheld)} more withheld by the budget - "
+                   f"`lessons.py for {owner}` lists them; `lessons.py show <ID>` "
+                   f"gives the reasoning behind a line.)")
+    else:
+        out.append("  (`lessons.py show <ID>` gives the reasoning behind a line.)")
+    return out
+
+
 def render_handoff(root: str, a: Artifact, n: int, cfg,
                    max_log: int = 3) -> list[str]:
     """The dispatch payload for one gate.
@@ -1750,6 +1902,9 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
     for p in g["prohibitions"]:
         out += _bullet(sub(p))
 
+    # ---- 2b. what the project has already paid for -----------------------
+    out += _lesson_block(root, owner)
+
     # ---- 3. the reference ------------------------------------------------
     out.append("")
     out.append("--- reference (read these yourself; they are not pasted here) ---")
@@ -1769,7 +1924,24 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
             out.append(f"pr        {a.fm.get('pr')}")
         if n != 5:
             out.append(f"checks    python3 .claude/scripts/forge.py checks {ctx['scope']}")
-        out.append(f"docs      python3 .claude/scripts/kb.py for-ticket {a.id}")
+        # The paths, not only the command that would print them. A reference
+        # line an agent has to run to discover whether there is anything to
+        # read is one it can skip without ever knowing what it skipped; the
+        # bodies still cost a read, which is the part worth deferring.
+        notes = a.listfield("docs")
+        if notes:
+            out.append(f"docs      {len(notes)} note(s) bound to this ticket - "
+                       f"read them before you touch the code:")
+            for note in notes:
+                out.append(f"          {note}")
+            out.append(f"          python3 .claude/scripts/kb.py for-ticket {a.id}"
+                       f"   # titles, and one hop further")
+        elif a.fm.get("docs_waiver"):
+            out.append(f"docs      none - {a.fm.get('docs_waiver')}")
+        else:
+            out.append(f"docs      none listed, and no waiver - "
+                       f"`python3 .claude/scripts/kb.py find <keyword>` before you "
+                       f"assume the knowledge base is empty")
 
     if n in (2, 3, 4) and a.fm.get("branch"):
         repo = ctx["repo"]
@@ -1777,7 +1949,7 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
                    f"<base>...{a.fm.get('branch')}   # qa's test files")
 
     if spec is not None:
-        if n in (2, 3, 4):
+        if n in (1, 2, 3, 4):
             rows = [r for r in table_rows(spec.section("Brief") or "")
                     if r and REQ_RE.match(r[0]) and (len(r) < 3 or r[2] != "dropped")]
             if rows:
@@ -1786,6 +1958,25 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
                 for r in rows:
                     status = r[2] if len(r) > 2 else "?"
                     out.append(f"  {r[0]}  [{status}]  {r[1] if len(r) > 1 else ''}")
+        # Gate 1 runs twice - before the questions and after them - and the
+        # answers are the one thing in this payload that the repository could
+        # not reconstruct. Rendering them from the file is what lets the second
+        # dispatch be the same command as the first, with nothing relayed by
+        # hand in between.
+        if n == 1:
+            rows = [r for r in table_rows(spec.section("Questions") or "")
+                    if r and not is_placeholder(r[0])]
+            if rows:
+                out.append("")
+                out.append("spec ## Questions")
+                for r in rows:
+                    # The cell escapes a pipe so the table survives; the payload
+                    # is prose, and must show the user's words as they were said.
+                    answer = ("" if len(r) < 4 or is_placeholder(r[3])
+                              else r[3].replace("\\|", "|"))
+                    out.append(f"  {r[0]}  blocks {r[1] if len(r) > 1 else '?'}: "
+                               f"{r[2] if len(r) > 2 else ''}")
+                    out.append(f"      answer: {answer or '(still open - do not guess it)'}")
         if n in (2, 3, 5):
             body = (spec.section("Spec") or "").strip()
             if body:
@@ -1837,6 +2028,189 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
     out.append("Finish with: agile.py lint and kb.py lint, both exit 0.")
     out.append(bar)
     return out
+
+
+# --------------------------------------------------------------------------
+# handback - the other half of the dispatch
+#
+# `handoff` builds what a subagent is told. This checks what came back, from
+# the repository rather than from the subagent's report. A gate that did not
+# land is the normal failure of a long dispatch chain, and the dangerous part
+# has never been the failure - it is the orchestrator believing a fluent
+# summary of work that did not happen and dispatching the next gate anyway.
+#
+# It runs nothing: no tests, no checks, no suite. Everything here is readable
+# from the tracker and from git refs, and what cannot be is printed as
+# unchecked rather than assumed.
+# --------------------------------------------------------------------------
+
+def _log_mentions(a: Artifact) -> str:
+    return (a.section("Log") or "") + (a.section("Implementation notes") or "")
+
+
+def _agreed_reqs(spec: Artifact | None) -> list[str]:
+    if spec is None:
+        return []
+    return [r[0] for r in table_rows(spec.section("Brief") or "")
+            if r and REQ_RE.match(r[0])
+            and (len(r) > 2 and r[2] in ("agreed", "assumed"))]
+
+
+def handback_checks(root: str, a: Artifact, n: int, arts: list[Artifact],
+                    cfg) -> tuple[list[tuple[bool, str]], list[str]]:
+    """(checks, unchecked) for one gate. A check is (passed, what was checked)."""
+    ctx = gate_context(root, a, cfg)
+    spec = _spec_of(root, a.id)
+    reqs = _agreed_reqs(spec)
+    log = _log_mentions(a)
+    checks: list[tuple[bool, str]] = []
+    unchecked: list[str] = []
+
+    def want(ok: bool, text: str) -> None:
+        checks.append((bool(ok), text))
+
+    if n == 1:
+        waiver = a.fm.get("spec_waiver")
+        want(spec is not None or waiver, "a spec exists, or spec_waiver argues why not")
+        if spec is not None:
+            want(spec.fm.get("status") == "agreed",
+                 f"the spec is 'agreed' (it is '{spec.fm.get('status')}')")
+            open_qs = [r[0] for r in table_rows(spec.section("Questions") or "")
+                       if r and not is_placeholder(r[0])
+                       and (len(r) < 4 or is_placeholder(r[3]))]
+            want(not open_qs,
+                 f"every question is answered{' - open: ' + ', '.join(open_qs) if open_qs else ''}")
+            criteria = a.section("Acceptance criteria") or ""
+            untagged = [r for r in reqs if r not in criteria]
+            want(not untagged,
+                 f"every live REQ is tagged into the criteria"
+                 f"{' - untagged: ' + ', '.join(untagged) if untagged else ''}")
+        want(a.status == "writing_tests",
+             f"the ticket moved to 'writing_tests' (it is '{a.status}')")
+        unchecked.append("whether a requirement marked 'assumed' should have been a "
+                         "question - only the user can say, and gate 4 argues it again")
+    elif n == 2:
+        branch = a.fm.get("branch")
+        want(bool(branch), f"the ticket records its branch ({branch or 'empty'})")
+        if branch:
+            want(_git_has_ref(ctx["repo"], str(branch)),
+                 f"the branch {branch} exists in {ctx['repo']}")
+        want(a.status == "in_progress",
+             f"the ticket moved to 'in_progress' (it is '{a.status}')")
+        want(str(a.fm.get("assignee") or "") == ctx["agent"],
+             f"it is assigned to {ctx['agent']} (it is '{a.fm.get('assignee')}')")
+        missing = [r for r in reqs if r not in log]
+        want(not missing,
+             f"'## Log' carries the red output per REQ"
+             f"{' - silent on: ' + ', '.join(missing) if missing else ''}")
+        unchecked.append("that the tests were really red - only qa watched them fail")
+    elif n == 3:
+        want(a.status == "review", f"the ticket moved to 'review' (it is '{a.status}')")
+        want(bool(a.fm.get("pr")), "a PR is recorded")
+        want(bool(a.listfield("docs")) or bool(a.fm.get("docs_waiver")),
+             "docs: names the notes the work filed, or docs_waiver argues why none")
+        missing = [r for r in reqs if r not in log]
+        want(not missing,
+             f"'## Log' carries an evidence line per REQ"
+             f"{' - silent on: ' + ', '.join(missing) if missing else ''}")
+        unchecked.append("that the checks it reports as green really ran - gate 4 runs them again")
+    elif n == 4:
+        want(a.status in ("review", "verify"),
+             f"the ticket is still at review or beyond (it is '{a.status}')")
+        boxes = re.findall(r"^\s*-\s*\[( |x|X)\]", a.section("Acceptance criteria") or "",
+                           re.MULTILINE)
+        want(boxes and all(b.lower() == "x" for b in boxes),
+             f"every acceptance box is ticked ({sum(1 for b in boxes if b.lower() == 'x')}"
+             f"/{len(boxes)})")
+        missing = [r for r in reqs if r not in log]
+        want(not missing,
+             f"every agreed REQ is named in '## Log'"
+             f"{' - silent on: ' + ', '.join(missing) if missing else ''}")
+        unchecked.append("the test-file diff against the red commit - qa runs it and reports the sha")
+        unchecked.append("the suite, and the per-scope checks")
+    elif n == 5:
+        want(bool(a.listfield("lessons")) or bool(a.fm.get("lessons_waiver")),
+             "lessons: names what the ticket taught, or lessons_waiver argues it taught nothing")
+        notes = a.listfield("docs")
+        gone = [str(d) for d in notes
+                if not os.path.exists(os.path.join(root, cfg.kb_rel, str(d)))
+                and not os.path.exists(os.path.join(root, str(d)))]
+        want(not gone,
+             f"every note in docs: resolves{' - missing: ' + ', '.join(gone) if gone else ''}")
+        unchecked.append("whether each note is filed under the right type - lint cannot see a "
+                         "misfiling, which is why gate 5 has a human-shaped judgement in it")
+    elif n == 6:
+        by_id = {x.id for x in arts if x.id}
+        rows = [r for r in table_rows((spec.section("Carryover") if spec else "") or "")
+                if r and REQ_RE.match(r[0])]
+        unfiled = [r[0] for r in rows
+                   if not (len(r) > 1 and (NO_TICKET_RE.match(r[-1])
+                                           or any(t in by_id for t in ID_IN_TEXT_RE.findall(r[-1]))))]
+        want(not unfiled,
+             f"every carryover row names a ticket that exists, or NO-TICKET"
+             f"{' - open: ' + ', '.join(unfiled) if unfiled else ''}")
+        if not rows:
+            unchecked.append("nothing was deferred, so gate 6 had nothing to file")
+
+    # The tracker's own invariants, narrowed to this ticket and its spec.
+    mine = [i for i in validate(root, arts)
+            if a.id in str(i) or (spec is not None and spec.rel in str(i))]
+    errs = [i for i in mine if i.level == "ERROR"]
+    want(not errs, f"`agile.py lint` is clean for {a.id}"
+                   f"{' - ' + str(len(errs)) + ' error(s)' if errs else ''}")
+    return checks, unchecked
+
+
+def _git_has_ref(repo: str, ref: str) -> bool:
+    try:
+        return subprocess.run(["git", "-C", repo, "rev-parse", "--verify", ref],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              timeout=10).returncode == 0
+    except Exception:
+        return False
+
+
+def cmd_handback(root: str, arts: list[Artifact], args: list[str]) -> int:
+    rest = list(args)
+    n = None
+    if "--gate" in rest:
+        i = rest.index("--gate")
+        try:
+            n = int(rest[i + 1])
+        except (IndexError, ValueError):
+            print("fatal: --gate needs a number", file=sys.stderr)
+            return 1
+        del rest[i:i + 2]
+    if not rest:
+        print("fatal: handback needs a ticket id", file=sys.stderr)
+        return 1
+    if n not in GATES:
+        print(f"fatal: handback needs --gate <1-{len(GATES)}>", file=sys.stderr)
+        return 1
+    ident = rest[0]
+    a = next((x for x in arts if x.id == ident), None)
+    if a is None:
+        print(f"fatal: no artifact with id '{ident}'", file=sys.stderr)
+        return 1
+
+    cfg = forgecfg.load(root)
+    checks, unchecked = handback_checks(root, a, n, arts, cfg)
+    failed = [c for c in checks if not c[0]]
+    print(f"HANDBACK {ident} — gate {n} of {len(GATES)} — {GATES[n]['name']}")
+    for ok, text in checks:
+        print(f"  {'PASS' if ok else 'FAIL'}  {text}")
+    for text in unchecked:
+        print(f"  ----  not checked here: {text}")
+    print()
+    if failed:
+        print(f"VERDICT: {len(failed)} of {len(checks)} checks failed. Gate {n} did not "
+              f"land, whatever the report said. Send it back to "
+              f"{gate_owner(GATES[n], gate_context(root, a, cfg))} rather than "
+              f"dispatching the next gate.")
+        return 2
+    print(f"VERDICT: gate {n} landed, as far as the repository can tell. The "
+          f"unchecked lines above are what you still have to read the report for.")
+    return 0
 
 
 def cmd_handoff(root: str, arts: list[Artifact], args: list[str]) -> int:
@@ -1927,6 +2301,8 @@ def main(argv: list[str]) -> int:
         return cmd_gates(args[1:])
     if cmd == "handoff":
         return cmd_handoff(root, arts, args[1:])
+    if cmd == "handback":
+        return cmd_handback(root, arts, args[1:])
     if cmd == "next-req":
         if len(args) < 2:
             print("fatal: next-req needs a ticket id", file=sys.stderr)

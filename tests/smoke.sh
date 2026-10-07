@@ -122,6 +122,17 @@ want 2 "a skeleton spec is not agreed" -- python3 .claude/scripts/agile.py spec 
 [ "$(python3 .claude/scripts/agile.py next-req TASK-0001)" = "REQ-0001" ] \
   && ok "next-req starts at REQ-0001" || bad "next-req did not start at REQ-0001"
 
+# the user's answers go into the file, not into the next prompt
+want 1 "spec answer refuses a question that does not exist" -- \
+  python3 .claude/scripts/agile.py spec answer TASK-0001 Q7="never asked"
+want 1 "spec answer refuses an empty answer" -- \
+  python3 .claude/scripts/agile.py spec answer TASK-0001 Q1=
+want 0 "spec answer writes the answer into the spec" -- \
+  python3 .claude/scripts/agile.py spec answer TASK-0001 Q1="200, and a | in the text"
+grep -q '200, and a \\| in the text' docs/agile/specs/TASK-0001.md \
+  && ok "the answer is in the file, with the pipe escaped" \
+  || bad "spec answer did not write the cell"
+
 # fill the brief the way qa would at gate 1, and point the ticket at it
 python3 - <<'PY2'
 p = "docs/agile/specs/TASK-0001.md"
@@ -199,6 +210,25 @@ printf '%s' "$OUT" | grep -q "api" \
 printf '%s' "$OUT" | grep -q "Prove the pipeline end to end" \
   && bad "handoff pasted the ticket body instead of its path" \
   || ok "handoff carries paths, not pasted file bodies"
+printf '%s' "$OUT" | grep -q "spec ## Questions" \
+  && ok "gate 1 renders the answers back from the file" \
+  || bad "gate 1 did not carry the answers"
+
+echo "== handback: what actually came back"
+want 1 "handback needs a gate" -- python3 .claude/scripts/agile.py handback TASK-0001
+want 1 "handback refuses a gate that does not exist" -- \
+  python3 .claude/scripts/agile.py handback TASK-0001 --gate 9
+OUT="$(python3 .claude/scripts/agile.py handback TASK-0001 --gate 1)"; RC=$?
+[ "$RC" = 2 ] && ok "handback fails a gate that did not land" \
+  || { bad "handback passed a gate that did not land"; printf '%s\n' "$OUT" | sed 's/^/       /'; }
+printf '%s' "$OUT" | grep -q "writing_tests" \
+  && ok "handback names the exit condition that is missing" \
+  || bad "handback did not say what was missing"
+printf '%s' "$OUT" | grep -q "not checked here" \
+  && ok "handback says what it did not check" \
+  || bad "handback hid its own limits"
+want 0 "handback passes gate 6 when every carryover row is argued" -- \
+  python3 .claude/scripts/agile.py handback TASK-0001 --gate 6
 
 echo "== the docs gate"
 # a claim made now, not a literal date - a hardcoded one ages past
@@ -275,6 +305,16 @@ PY2
 want 0 "a filled lesson lints clean" -- python3 .claude/scripts/lessons.py lint
 python3 .claude/scripts/lessons.py for api-engineer | grep -q "LESSON-0001" \
   && ok "the engineer is handed its scope's rule" || bad "the hand-off missed the rule"
+# the dispatch payload carries the rules, so obeying them is not a tool call away.
+# gate 3 is the engineer's, which is who this rule addresses; handoff still renders
+# the payload when the ticket cannot reach the gate, which is all this needs.
+OUT="$(python3 .claude/scripts/agile.py handoff TASK-0001 --gate 3)"
+printf '%s' "$OUT" | grep -q "THIS PROJECT HAS LEARNED" \
+  && ok "the handoff renders the lessons into the payload" \
+  || bad "the payload left the lessons to a command the agent may skip"
+printf '%s' "$OUT" | sed -n '/THIS PROJECT HAS LEARNED/,$p' | grep -q "^--- reference" \
+  && ok "the lesson block sits in the binding half, before the reference" \
+  || bad "the lesson block landed after the reference material"
 python3 .claude/scripts/lessons.py for pm | grep -q "none recorded yet" \
   && ok "a rule addressed to engineers does not reach pm" || bad "roles are not filtered"
 python3 .claude/scripts/lessons.py for qa --scope api | grep -q "none recorded yet" \

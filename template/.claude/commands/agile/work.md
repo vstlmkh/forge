@@ -18,27 +18,50 @@ python3 .claude/scripts/agile.py gates
 
 ## How you compose every prompt in this command
 
-**You do not write dispatch prompts by hand.** For each gate:
+**You do not write dispatch prompts by hand, and you do not relay anything by
+hand either.** For each gate:
 
 ```bash
 python3 .claude/scripts/agile.py handoff $ARGUMENTS --gate <N>
 ```
 
-Send that output to the subagent **verbatim**, and add only what the script
-cannot know — the user's answers at gate 1, QA's findings on a rejection.
+Send that output to the subagent **verbatim, and send nothing else**. Everything
+a gate needs is in it, because everything a gate needs is in the repository:
+the contract, the rules this project has already paid for, the ticket's notes,
+the spec's brief, the answers the user gave at gate 1, and the last few `## Log`
+entries — including a rejection written by the gate that sent the work back.
 
-The layout it produces is the point, not a formatting preference. The binding
-instructions sit in the first screen and are repeated, compressed, in the last;
-the reference material sits between them as paths and commands rather than
-pasted file contents. **An instruction buried in the middle of a long prompt is
-an instruction that will not be followed** — that is why nothing binding is ever
-put there, and why you must not "tidy" the payload by moving the anchor or
-splicing your own preamble in front of the contract. Append your extra context
-to the reference section, in the middle, where it belongs.
+That is the rule, not a style preference. A fact that reaches a subagent only
+through your message reaches it exactly once and survives only as long as your
+context does; the same fact written into the ticket, the spec or the lessons
+layer is in git. **If you find yourself wanting to add a paragraph, the paragraph
+belongs in a file** — put it there and re-run `handoff`.
+
+The layout it produces is the point too. The binding instructions sit in the
+first screen and are repeated, compressed, in the last; the reference material
+sits between them as paths and commands rather than pasted file contents. **An
+instruction buried in the middle of a long prompt is an instruction that will not
+be followed** — so do not "tidy" the payload by moving the anchor or splicing a
+preamble in front of the contract.
 
 If `handoff` exits 2 it prints `BLOCKED` and names the transition that is
 missing: the ticket is not where that gate runs. Fix the ticket's state or stop
 — do not dispatch anyway.
+
+## How you check every gate before you believe it
+
+```bash
+python3 .claude/scripts/agile.py handback $ARGUMENTS --gate <N>
+```
+
+Run it after every dispatch, before the next one. It reads the repository rather
+than the report: did the status move, is the branch there, is the PR recorded,
+is there an evidence line per requirement, is `lint` clean for this ticket. Exit
+2 means the gate did not land whatever the subagent said, and the move is to send
+it back — not to dispatch the next gate over a gap.
+
+It runs nothing, and it says so: the lines marked `not checked here` are the ones
+you still have to read the subagent's report for.
 
 ## 1. Preflight — you do this yourself, before dispatching anyone
 
@@ -78,8 +101,24 @@ comes back with **a batch of open questions** — not with a finished spec.
 - offering "defer this" as a real option. A deferred answer is carryover, which
   is a recorded decision — it is not a gap.
 
-Dispatch `qa` again with the answers. It finishes the brief, moves anything
-deferred or unanswered into `## Carryover`, writes the spec and the plan, tags
+**Then write the answers down before you dispatch anybody:**
+
+```bash
+python3 .claude/scripts/agile.py spec answer $ARGUMENTS Q1="<what the user said>" Q2="..."
+```
+
+This is the one moment in the whole cycle where something the repository cannot
+reconstruct — the user's own words — is passing through you. Written into
+`## Questions` it is in git and the next payload renders it back; carried in your
+next message it lasts exactly as long as this context does, and a compaction, an
+interruption or a paraphrase loses it silently. A deferral is written
+`Q3="DEFERRED - <the user's reason>"`, never left blank. The command refuses a
+question id that does not exist, which is how a typo stops being a dropped
+answer.
+
+Then dispatch `qa` again with the **same command as before** —
+`handoff $ARGUMENTS --gate 1` — now carrying the answers. It finishes the brief,
+moves anything deferred into `## Carryover`, writes the spec and the plan, tags
 the acceptance criteria with their `(REQ-NNNN)`, and moves the ticket to
 `writing_tests`.
 
@@ -93,6 +132,8 @@ Three legitimate outcomes are not a handover:
   `spec_waiver: NO-SPEC (<reason>)` and moves straight on. Check the reason is
   honest: if a question could sensibly have been asked, it was not too small.
 
+Check it landed: `python3 .claude/scripts/agile.py handback $ARGUMENTS --gate 1`.
+
 Read the brief before you go on. Anything marked `assumed` is a decision `qa`
 made alone — if it looks consequential, put it to the user now rather than
 discovering it at `verify`.
@@ -103,6 +144,8 @@ Dispatch `qa` with the gate 2 payload. It cuts the branch, writes a test per
 `agreed` requirement, **proves them red**, commits the tests alone, pushes, and
 hands the ticket to the engineer in `in_progress` with the red output in
 `## Log`.
+
+Check it landed: `python3 .claude/scripts/agile.py handback $ARGUMENTS --gate 2`.
 
 Read the red output before dispatching the engineer. If `qa` reports tests that
 were never red, or red for a reason unrelated to the ticket, send it back — a
@@ -118,6 +161,8 @@ log, runs the tests to see them fail, implements until they pass, runs every
 available check for that scope plus the whole suite, commits with a `Refs:`
 trailer, pushes, opens a PR, files the knowledge-base notes its work revealed,
 and sets `status: review`.
+
+Check it landed: `python3 .claude/scripts/agile.py handback $ARGUMENTS --gate 3`.
 
 It must not cut a new branch, touch `qa`'s tests, or implement a requirement the
 brief does not carry. If it reports that a test is genuinely wrong, the legal
@@ -139,12 +184,21 @@ any requirement still `assumed`, and judges the notes the engineer filed. `pm`
 turns each carryover row into a groomed ticket and writes the id back into the
 row.
 
+Check they landed: `handback $ARGUMENTS --gate 4`, `--gate 5` and `--gate 6`.
+
 `qa` makes the `review -> verify` move once both have reported, or rejects to
 `in_progress` with the failing command and its output.
 
-On a rejection, hand the QA findings back to the same engineer and repeat this
-step. **After two rejections, stop and bring the user in** — a third automated
-attempt on the same ticket usually means the brief is wrong, not the code.
+On a rejection, `qa` writes the finding into `## Log` as a `REJECTED G4:` or
+`REJECTED G5:` entry carrying the command, its output and the requirement it
+blocks. You re-dispatch the **same engineer with a plain
+`handoff $ARGUMENTS --gate 3`** — the payload carries the last log entries, so
+the finding travels in the ticket rather than in your message. If `qa` reported
+something to you that is not in the ticket, that is the bug: send it back to
+write it down rather than relaying it yourself.
+
+**After two rejections, stop and bring the user in** — a third automated attempt
+on the same ticket usually means the brief is wrong, not the code.
 
 ## 6. Report
 

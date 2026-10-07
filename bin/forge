@@ -34,7 +34,7 @@ import sys
 # into ~/.forge, and template/ has to be found relative to the real file.
 HERE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 TEMPLATE = os.path.join(HERE, "template")
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 FORGE_NAME = "forge"
 FORGE_URL = "https://github.com/vstlmkh/forge"
 
@@ -914,6 +914,13 @@ def cmd_upgrade(argv: list[str]) -> int:
     if "--agents" in argv:
         for agent in render_agents(target, cfg, force=True):
             say(f"  re-rendered .claude/agents/{agent}.md")
+    else:
+        # The engineer agents are the one generated file `upgrade` leaves alone,
+        # because a project may have edited the notes block in them. That makes
+        # them the one file that can go stale against a payload change - so say
+        # so rather than letting the next dispatch find out.
+        say("  engineer agents left alone - `forge upgrade --agents` re-renders "
+            "them if the skills they point at have moved")
     say("done. Run `python3 .claude/scripts/forge.py doctor` to check the result.")
     return 0
 

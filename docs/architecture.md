@@ -67,17 +67,54 @@ line and a deferred ticket all point at the same thing.
 
 ## Why the dispatch prompt is built by a script
 
-`agile.py handoff <ID> --gate <N>` renders a fixed five-part payload: the gate's
-contract, the prohibitions that bind at that gate, the reference material, the
-steps, and then the contract and prohibitions again, compressed.
+`agile.py handoff <ID> --gate <N>` renders a fixed payload: the gate's contract,
+the prohibitions that bind at that gate, the rules this project has already paid
+for, the reference material, the steps, and then the contract and prohibitions
+again, compressed.
 
 The repetition is not redundancy. Attention falls off in the middle of a long
 prompt, so anything binding is placed in the first screen and the last, and the
 middle carries only inert reference — and that reference is paths and commands
-rather than pasted file bodies, which is also what keeps a payload around 700
-tokens instead of several thousand. A model tier per role lives in
+rather than pasted file bodies, which is also what keeps a payload around a
+thousand tokens instead of several thousand. A model tier per role lives in
 `forge.json` under `policy.models`, because a model is bound to an agent file
 rather than to a dispatch.
+
+The lessons block is rendered into the payload rather than left to a
+`lessons.py for <agent>` the agent is told to run. An instruction is something an
+agent may skip; a payload is not. The cap that makes the layer affordable is the
+same one `lessons.py for` applies — `rules_for()` is shared, so there is one
+ranking and one budget rather than two that drift.
+
+## Why nothing is relayed by hand
+
+Everything a gate needs is in the repository, and the orchestrator sends the
+payload and nothing else. A fact that reaches a subagent only through the
+orchestrator's own message survives exactly as long as that context does; the
+same fact in the ticket, the spec or the lessons layer is in git and the next
+payload renders it back. So a rejection is a `REJECTED G4:` entry in `## Log`
+rather than a paragraph in the re-dispatch, and the user's answers at gate 1 —
+the one thing in the whole cycle the repository cannot reconstruct — are written
+with `agile.py spec answer <ID> Q1="..."` the moment they are given.
+
+The other half of the same idea is `agile.py handback <ID> --gate <N>`. It reads
+the repository rather than the subagent's report and answers one question: did
+this gate land? Status moved, branch present, PR recorded, an evidence line per
+requirement, `lint` clean for this ticket. It runs nothing — no tests, no checks
+— and prints what it could not check rather than implying coverage it does not
+have. A long dispatch chain fails in the ordinary way; what makes it dangerous
+is a fluent summary of work that did not happen, and this is what makes that
+case visible instead.
+
+## Where the context budget goes
+
+A gate dispatch costs the agent file, the managed `CLAUDE.md` block, the skills
+that agent loads, and the payload. The payload is the smallest of the four, so
+the contract lives in exactly one place — the `GATES` table in `agile.py` — and
+the agent files and skills point at it rather than restating it. `agile-claims`
+is split out of `agile-artifacts` for the same reason: an engineer never creates
+a ticket and never claims one, so the claim protocol is not worth its context on
+every gate 3.
 
 ## The hooks, and what each one is for
 

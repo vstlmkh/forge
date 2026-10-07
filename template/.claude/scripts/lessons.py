@@ -520,15 +520,18 @@ def _strip_flags(argv: list[str], names: tuple[str, ...]) -> list[str]:
     return out
 
 
-def cmd_for(root: str, lessons: list[Lesson], argv: list[str]) -> int:
-    """The hot path: what one agent must obey, ranked and capped.
+def rules_for(root: str, who: str | None, scope: str | None = None,
+              budget: int | None = None) -> tuple[list[Lesson], list[Lesson], str]:
+    """The rules binding one audience: (shown, withheld, how to name them).
 
-    Never fails. It runs at the top of a gate, and an agent that reads a
-    non-zero exit here learns to stop running it."""
+    Factored out of `cmd_for` so that `agile.py handoff` can render the same
+    ranked, capped list straight into a dispatch payload. One ranking, one cap,
+    one place - a second implementation would drift, and the budget is the
+    whole reason this layer is affordable.
+
+    Raises ValueError when `who` names nothing the project has.
+    """
     cfg = forgecfg.load(root)
-    rest = _strip_flags(argv, ("--scope", "--budget"))
-    who = rest[0] if rest else None
-    scope = _flag(argv, "--scope")
     role = None
     if who:
         if who in cfg.agents or who in forgecfg.AGENT_ALIASES:
@@ -539,19 +542,38 @@ def cmd_for(root: str, lessons: list[Lesson], argv: list[str]) -> int:
         elif who in cfg.scopes:
             scope = scope or who
         elif who != ALL:
-            print(f"fatal: '{who}' is not an agent, a role {list(ROLES)} or a scope "
-                  f"{list(cfg.scopes)}", file=sys.stderr)
-            return 1
+            raise ValueError(
+                f"'{who}' is not an agent, a role {list(ROLES)} or a scope "
+                f"{list(cfg.scopes)}")
+    if budget is None:
+        budget = cfg.lesson_budget
+    budget = max(1, budget)
+
+    lessons, _fatal = load_lessons(root)
+    pool = [l for l in lessons if l.status == "active" and l.addresses(scope, role)]
+    pool.sort(key=lambda l: l.weight())
+    audience = " / ".join(x for x in (scope, role) if x) or "every agent"
+    return pool[:budget], pool[budget:], audience
+
+
+def cmd_for(root: str, lessons: list[Lesson], argv: list[str]) -> int:
+    """The hot path: what one agent must obey, ranked and capped.
+
+    Never fails. It runs at the top of a gate, and an agent that reads a
+    non-zero exit here learns to stop running it."""
+    cfg = forgecfg.load(root)
+    rest = _strip_flags(argv, ("--scope", "--budget"))
+    who = rest[0] if rest else None
     try:
         budget = max(1, int(_flag(argv, "--budget", cfg.lesson_budget)))
     except (TypeError, ValueError):
         budget = cfg.lesson_budget
-
-    pool = [l for l in lessons if l.status == "active" and l.addresses(scope, role)]
-    pool.sort(key=lambda l: l.weight())
-    shown, withheld = pool[:budget], pool[budget:]
-
-    audience = " / ".join(x for x in (scope, role) if x) or "every agent"
+    try:
+        shown, withheld, audience = rules_for(root, who, _flag(argv, "--scope"), budget)
+    except ValueError as exc:
+        print(f"fatal: {exc}", file=sys.stderr)
+        return 1
+    pool = shown + withheld
     if not pool:
         print(f"lessons for {audience}: none recorded yet.")
         return 0

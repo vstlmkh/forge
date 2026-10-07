@@ -318,6 +318,20 @@ batch in `## Questions` is waiting on the user; `agreed` means every one of
 them has a real answer. Nothing may reach `writing_tests` against a spec that
 is not `agreed`.
 
+The `Answer` column of `## Questions` is the one part of a spec written from
+outside the gate, and it is written by a command rather than by hand:
+
+```bash
+python3 .claude/scripts/agile.py spec answer TASK-0231 Q1="<what the user said>"
+```
+
+The orchestrator runs it the moment the user answers, and the gate 1 dispatch
+payload renders the table back on the second dispatch. The user's words are the
+only thing in the cycle the repository cannot reconstruct, so they are committed
+rather than relayed; a deferral is written `DEFERRED - <reason>`, never left
+blank. The command refuses a question id the table does not carry, which is what
+stops a typo becoming a silently dropped answer.
+
 ### 10.2 Sections
 
 | Section | Holds | Shape |

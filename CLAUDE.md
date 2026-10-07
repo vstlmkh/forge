@@ -54,6 +54,21 @@ It installs into a temporary repository and asserts the gates still fire. A
 change to `agile.py`, `kb.py`, `lessons.py` or a hook without a passing smoke run is not
 finished.
 
+The gate contract lives in exactly one place: the `GATES` table in
+`template/.claude/scripts/agile.py`. `agile.py gates` prints it, `handoff`
+renders it into a dispatch and `handback` checks the exit condition it states.
+Nothing under `template/` restates a gate's steps or prohibitions in prose —
+`agile-dod` carries the reasoning around the gates and the review checklist,
+never the contract itself. A second copy drifts, and the agent obeys whichever
+one it read last.
+
+Nothing is relayed by hand between gates, either. The orchestrator sends the
+payload and nothing else, so anything a later gate needs has to be written into
+the ticket, the spec or the lessons layer — `spec answer` for the user's
+answers at gate 1, a `REJECTED G4:` log entry for a rejection. If a change here
+would make a gate depend on something only the orchestrator's context holds, it
+is the wrong change.
+
 Changing a validation rule means changing it in **both** places: `validate()` in
 `template/.claude/scripts/agile.py` and the invariant list in
 `template/docs/agile/SCHEMA.md` §6. The script wins when they disagree, which is

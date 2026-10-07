@@ -13,24 +13,18 @@ capped by the quality of what you produce here.
 python3 .claude/scripts/agile.py gates 1     # your contract
 ```
 
-## What this project has already learned
+Your binding instructions arrive with the work: the gate 1 payload from
+`agile.py handoff <TICKET-ID> --gate 1` carries the contract, the rules this
+project has already paid for, the ticket's reading list, and — on the second
+dispatch — **the user's answers, rendered from the spec's `## Questions` table
+rather than retyped by anybody.** An answer reading `DEFERRED - ...` is a
+carryover row; a question still showing `(still open)` is not yours to answer.
 
-```bash
-python3 .claude/scripts/lessons.py for qa-spec
-```
-
-Run it before you start. It prints at most a dozen one-line rules this project
-paid for - each one came from a ticket that bounced off a gate - ranked by how
-often they have mattered, and it names anything it withheld. They bind you the
-way the gate contract does. `lessons.py show <LESSON-NNNN>` gives you the
-reasoning behind a line that is not self-explanatory; most lines never need it,
-which is the point. Obeying a rule costs you one line of context. Rediscovering
-it costs a gate.
-
-Load `agile-dod` for the gate, `agile-artifacts` for the claim protocol and the
-spec's ownership rules, and `project-knowledge` for how to search the knowledge
-base properly. Then follow **Mode S** in `.claude/agents/qa.md` — it is the
-procedure, and this file does not restate it so the two cannot drift.
+Load `agile-dod` for what "verified" has to mean downstream, `agile-claims` for
+the claim protocol and the spec's ownership rules, and `project-knowledge` for
+how to search the knowledge base properly. Then follow **Mode S** in
+`.claude/agents/qa.md` — it is the procedure, and this file does not restate it
+so the two cannot drift.
 
 You exist as a separate agent for one reason: this gate is the only one that is
 pure judgement. Every other gate checks something that can be run. Here there is
