@@ -1,15 +1,16 @@
 # How the harness is put together
 
-Three records, each with a validator, a generated index and a guard that stops
-an agent corrupting it by hand.
+Four records, each with a validator, a generated index and a guard that stops an
+agent corrupting it by hand.
 
 | Record | Path in a project | Validator | Answers |
 |---|---|---|---|
 | the tracker | `docs/agile/` | `agile.py lint` | what are we doing |
-| the knowledge base | `docs/knowledge/` | `kb.py lint` | what do we know |
+| the knowledge base | `docs/knowledge/` | `kb.py lint` | what do we know about the product |
+| the lessons | `docs/lessons/` | `lessons.py lint` | how work goes wrong here |
 | the shape | `forge.json` | `forge.py doctor` | what is this project made of |
 
-## Why a third record
+## Why a record of the project's shape
 
 The first version of this harness hardcoded two scopes, two submodules, two
 engineer agents and one Definition-of-Done matrix into the scripts, the skills
@@ -25,17 +26,22 @@ in every installation, which is what makes `forge upgrade` safe.
 ## Data flow
 
 ```
-forge.json ──► forge.py ──► agile.py ──► docs/agile/INDEX.md
-     │             │    └──► kb.py    ──► docs/knowledge/INDEX.md
-     │             └──► guard-*.py, kb-context.py, kb-nudge.py   (hooks)
+forge.json ──► forge.py ──► agile.py   ──► docs/agile/INDEX.md
+     │             │    ├──► kb.py      ──► docs/knowledge/INDEX.md
+     │             │    └──► lessons.py ──► docs/lessons/INDEX.md
+     │             └──► guard-*.py, kb-context.py, kb-nudge.py,
+     │                  lesson-nudge.py                          (hooks)
      └──► bin/forge ──► .claude/agents/{pm,qa,qa-spec,<scope>-engineer}.md,
                          the CLAUDE.md block
 ```
 
 `agile.py` owns the frontmatter parser — a deliberately restricted YAML subset:
-flat keys, flat lists, nothing nested. `kb.py` imports it, so the two records
-speak the same dialect and a note cannot drift into syntax the tracker could not
-parse. Both are stdlib-only because they run inside hooks, on every turn.
+flat keys, flat lists, nothing nested. `kb.py` and `lessons.py` import it, so
+every record speaks the same dialect and a note cannot drift into syntax the
+tracker could not parse. All three are stdlib-only because they run inside
+hooks, on every turn. The dependency goes one way: `agile.py` resolves a
+ticket's `lessons:` by reading the files rather than importing `lessons.py`,
+which imports `agile.py`.
 
 ## Why the spec is a separate file
 
@@ -77,11 +83,12 @@ rather than to a dispatch.
 
 | Hook | Event | Effect |
 |---|---|---|
-| `guard-index.py` | `PreToolUse` | denies a hand-edit of either generated `INDEX.md` |
+| `guard-index.py` | `PreToolUse` | denies a hand-edit of any generated `INDEX.md` |
 | `guard-kb.py` | `PreToolUse` | denies a misfiled or misnamed note, a new ticket with no `docs:` or no `spec:`, a spec not named after an existing ticket, and writes under a disowned knowledge directory |
 | `kb-nudge.py` | `PostToolUse` | catches a ticket moved to `review`/`done` with an empty `docs:`, while the agent still has the context to file the note |
 | `kb-context.py` | `UserPromptSubmit` | injects the knowledge base's coverage when a cycle command starts, so consulting it is cheap at the one moment it matters |
-| `agile.py index`, `kb.py index` | `Stop` | regenerate both boards once per turn |
+| `lesson-nudge.py` | `PostToolUse` | catches a ticket moving *backwards* and asks for the lesson while the agent still knows why it bounced |
+| `agile.py index`, `kb.py index`, `lessons.py index` | `Stop` | regenerate all three boards once per turn |
 
 Guards fail open: any internal error allows the write. A guard that breaks a
 session is worse than one that misses a file, and `lint` is the backstop.
@@ -106,3 +113,25 @@ reviewer. `lint` cannot catch a business rule filed as an `overview`; a human or
 Notes are a graph, not a tree: `INDEX.md` is a generated table of contents and
 the edges live in each note's `## Related`, reciprocal in both directions, with
 a reason on every link.
+
+## Why a lesson is one line
+
+The knowledge base is read on demand: an agent searches it, opens two notes and
+pays for what it opened. The lessons layer is read *unconditionally*, at the top
+of every gate, by every agent — so its cost is paid on every turn whether or not
+it is relevant, and that changes what the format can be.
+
+Hence one imperative line per rule, at most 120 characters, with the body behind
+a second command that most readers never run. Hence a hard cap
+(`policy.lesson_budget`, 12) on how many reach one agent, ranked by how often
+each has proved itself, with the withheld ones named rather than dropped
+silently. And hence decay: `lessons.py lint` warns when a rule has not been
+confirmed in `policy.lesson_stale_days`, because an obsolete rule is not
+harmless here — it is a line of context charged to every agent on every turn for
+a failure that no longer happens.
+
+The signal that fills the layer is a ticket moving backwards. A bounce is the
+only event the harness produces that distinguishes "the code was wrong" from
+"the process was wrong", and `lesson-nudge.py` fires on that edit rather than at
+gate 5 because the agent taking the failure edge is the only one who still knows
+why.

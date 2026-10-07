@@ -34,7 +34,7 @@ import sys
 # into ~/.forge, and template/ has to be found relative to the real file.
 HERE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 TEMPLATE = os.path.join(HERE, "template")
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 FORGE_NAME = "forge"
 FORGE_URL = "https://github.com/vstlmkh/forge"
 

@@ -3,7 +3,7 @@
 This repository **is the factory**, not a project that uses the factory. Nothing
 here is wired up: there is no `forge.json` at the root, no board, no knowledge
 base, and `.claude/scripts/` belongs to `template/`, not to this session. Do not
-run `agile.py` or `kb.py` against this repo, and do not install the harness into
+run `agile.py`, `kb.py` or `lessons.py` against this repo, and do not install the harness into
 it.
 
 ```
@@ -51,13 +51,22 @@ tests/smoke.sh
 ```
 
 It installs into a temporary repository and asserts the gates still fire. A
-change to `agile.py`, `kb.py` or a hook without a passing smoke run is not
+change to `agile.py`, `kb.py`, `lessons.py` or a hook without a passing smoke run is not
 finished.
 
 Changing a validation rule means changing it in **both** places: `validate()` in
 `template/.claude/scripts/agile.py` and the invariant list in
 `template/docs/agile/SCHEMA.md` §6. The script wins when they disagree, which is
-precisely why the prose must not drift from it.
+precisely why the prose must not drift from it. The same pairing holds for the
+other two records: `kb.py` with `template/docs/knowledge/README.md`, and
+`lessons.py` with `template/docs/lessons/README.md`.
+
+The lessons layer has one constraint the other records do not. It is read
+*unconditionally*, at the top of every gate, by every agent — so its cost is
+paid on every turn whether or not it is relevant. Anything that makes a rule
+longer, or makes more rules reach one agent, is charged to every ticket in the
+project. `rule:` is one line and `policy.lesson_budget` is a hard cap for that
+reason; if a change here would relax either, it needs to earn it.
 
 Adding a frontmatter field means four edits: `SCHEMA.md`, the required-fields
 list in the script, the skill that teaches the field, and the smoke test.
@@ -76,7 +85,7 @@ this session, and they are what the agent will obey. Write them accordingly:
 
 ## Attribution
 
-forge signs what forge generates — both `INDEX.md` boards, the managed
+forge signs what forge generates — all three `INDEX.md` boards, the managed
 `CLAUDE.md` block, the rendered agents — and nothing else. Adding a signature
 anywhere a human or an agent writes (a commit trailer, a PR body, a ticket, a
 note) is out of bounds: those belong to the project, not to the tool. Keep it

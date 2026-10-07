@@ -72,7 +72,11 @@ fix the note.
 {{KB_CALLOUT}}
 ## Lessons are what the gates taught
 
-```bash
+```
+/lessons:new <finding>  record what a bounced gate taught, as one imperative line
+/lessons:retro          merge duplicates, retire what no longer bites, stay inside the budget
+/lessons:lint           validate the layer and the tracker's links into it
+
 python3 .claude/scripts/lessons.py for <agent>   # the rules that bind it, capped and ranked
 python3 .claude/scripts/lessons.py show <LESSON-NNNN>
 ```

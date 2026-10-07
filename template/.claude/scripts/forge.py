@@ -287,8 +287,14 @@ class Config:
         return "engineer"
 
     def scope_of_agent(self, agent: str) -> str | None:
-        """The scope an agent owns, or None for pm and qa, who own them all."""
+        """The scope an agent owns, or None for pm and qa, who own them all.
+
+        pm and qa are named in `scopes` too - a non-code scope usually lists
+        them as its implementers - so the special case comes first, or `pm`
+        would be handed only the rules of whichever scope happened to list it."""
         agent = AGENT_ALIASES.get(agent, agent)
+        if agent in ("pm", "qa"):
+            return None
         for name, s in self.scopes.items():
             if agent in s.agents:
                 return name

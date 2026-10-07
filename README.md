@@ -14,9 +14,9 @@
 [![unpacked size](https://img.shields.io/npm/unpacked-size/@vstlmkh/forge?color=555)](https://www.npmjs.com/package/@vstlmkh/forge?activeTab=code)
 
 A reusable agent harness for software projects: a six-gate, specification-first
-development cycle, a Markdown tracker, a typed knowledge base, role agents and
-the hooks that keep all of it honest — installable into any repository in one
-command.
+development cycle, a Markdown tracker, a typed knowledge base, agents that
+accumulate the rules each project teaches them, and the hooks that keep all of
+it honest — installable into any repository in one command.
 
 ## Install
 
@@ -85,7 +85,7 @@ commands work; `forge doctor` and you decide whether they do.
 detected, so the usual answer is "yes, that's right".
 
 Either way it writes `forge.json`, copies the harness into `.claude/`, scaffolds
-`docs/agile/` and `docs/knowledge/`, renders one engineer agent per scope, and
+`docs/agile/`, `docs/knowledge/` and `docs/lessons/`, renders one engineer agent per scope, and
 adds a managed block to your `CLAUDE.md`. Nothing else in the project is
 touched.
 
@@ -95,10 +95,11 @@ touched.
 |---|---|
 | `docs/agile/` | backlog, task tracker and bug tracker as Markdown with YAML frontmatter; `INDEX.md` is generated |
 | `docs/knowledge/` | eight-type knowledge base — business rules, incidents, decisions, contracts — with a generated coverage index |
+| `docs/lessons/` | what the gates taught: one imperative line per rule, handed to the agent it binds, capped and ranked |
 | `.claude/agents/` | `pm`, `qa`, and one engineer per code scope |
-| `.claude/skills/` | the operating rules: artifacts, grooming, git, Definition of Done, knowledge |
-| `.claude/commands/` | `/agile:*`, `/kb:*`, `/forge:doctor` |
-| `.claude/scripts/` | `agile.py`, `kb.py`, `forge.py` and four hooks — stdlib-only Python 3, no dependencies |
+| `.claude/skills/` | the operating rules: artifacts, grooming, git, Definition of Done, knowledge, lessons |
+| `.claude/commands/` | `/agile:*`, `/kb:*`, `/lessons:*`, `/forge:doctor` |
+| `.claude/scripts/` | `agile.py`, `kb.py`, `lessons.py`, `forge.py` and five hooks — stdlib-only Python 3, no dependencies |
 | `forge.json` | **the only project-specific file**: repositories, scopes, owning agents, and the Definition-of-Done matrix |
 
 ## The cycle it enforces
@@ -113,9 +114,15 @@ than trusted:
   a rejection.
 - **Nobody closes their own work.** An engineer stops at `review`, `qa` moves it
   to `verify`, and only the top-level session sets `done`.
-- **A gap is named, not hidden.** `SKIPPED`, `NO-TEST` and `NO-DOCS` are the
-  three waivers; each one must name what it falls back on, and `lint` refuses a
-  ticket that reaches review having recorded neither a note nor a reason.
+- **A gap is named, not hidden.** `SKIPPED`, `NO-TEST`, `NO-DOCS` and
+  `NO-LESSON` are the four waivers; each one must name what it falls back on,
+  and `lint` refuses a ticket that reaches review having recorded neither a note
+  nor a reason.
+- **A bounced gate teaches something.** A ticket that goes backwards owes a
+  rule, filed by whoever took that edge, at the moment they take it. Every agent
+  is handed its scope's rules — one line each, capped at a dozen, ranked by how
+  often they have mattered — at the start of every gate, and a rule nobody has
+  needed in six months is reported as the context cost it has become.
 
 ## Everything project-specific lives in `forge.json`
 
@@ -187,7 +194,7 @@ forge/
 ├── assets/banner.py       regenerates the banners; imports the mark
 ├── template/              the payload that gets copied into a project
 │   ├── .claude/           agents, skills, commands, scripts, settings
-│   ├── docs/              the tracker and knowledge-base specifications
+│   ├── docs/              the tracker, knowledge-base and lessons specifications
 │   ├── CLAUDE.harness.md.tmpl
 │   └── forge.example.*.json
 ├── docs/                  how the harness works and how to extend it
@@ -212,13 +219,13 @@ tests/smoke.sh
 ```
 
 Installs into a temporary repository, files a ticket and a note through the
-scripts, and asserts that each gate fires: the docs gate, the knowledge-base
-naming guard, the generated-index guard, the byte-stability of both indexes, and
-the one-working-tree rule.
+scripts, and asserts that each gate fires: the spec gate, the docs gate, the
+lessons gate, the knowledge-base naming guard, the generated-index guard, the
+byte-stability of all three indexes, and the one-working-tree rule.
 
 ## Attribution
 
-forge signs the files it generates — the two `INDEX.md` boards, the managed
+forge signs the files it generates — the three `INDEX.md` boards, the managed
 `CLAUDE.md` block, the rendered engineer agents — with one line and a link:
 
 ```markdown

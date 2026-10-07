@@ -26,6 +26,8 @@ Commands
                                 this lesson just proved itself again
     retire <LESSON-NNNN> --reason "..."
     supersede <LESSON-NNNN> --by <LESSON-NNNN>
+    audit                       the decision queue: every active rule with its age,
+                                  its weight and who the budget hides it from
     lint                        validate only, print PATH:FIELD: LEVEL: MESSAGE
     index                       regenerate <lessons>/INDEX.md
     roles                       print the legal scope/role vocabulary
@@ -756,6 +758,63 @@ def cmd_supersede(root: str, lessons: list[Lesson], argv: list[str]) -> int:
     return 0
 
 
+def cmd_audit(root: str, lessons: list[Lesson], arts) -> int:
+    """What a retrospective has to decide, and nothing it can decide alone.
+
+    Every verdict here is a judgement - whether two rules are really the same
+    rule, whether an unconfirmed one is stale or merely lucky - so this prints
+    the queue and the evidence, and stops. `confirm`, `retire` and `supersede`
+    are one call away and are deliberately not called from here."""
+    cfg = forgecfg.load(root)
+    live = [l for l in lessons if l.status == "active"]
+    by_ticket_status = {a.id: a.status for a in arts if a.id}
+
+    # Who actually receives what. The budget bites per audience, not per scope:
+    # a rule filed under `all` can sit inside one agent's dozen and outside
+    # another's, and reporting it by folder would hide exactly that.
+    hidden_from: dict[str, list[str]] = {l.id: [] for l in live}
+    for agent in cfg.agents:
+        pool = sorted((l for l in live
+                       if l.addresses(cfg.scope_of_agent(agent), cfg.role_of_agent(agent))),
+                      key=lambda l: l.weight())
+        for l in pool[cfg.lesson_budget:]:
+            hidden_from[l.id].append(agent)
+
+    print(f"{len(live)} active rule(s), budget {cfg.lesson_budget} per hand-off, "
+          f"stale after {cfg.lesson_stale_days} days.")
+    for scope in cfg.lesson_scopes():
+        here = sorted((l for l in live if l.lscope == scope), key=lambda l: l.weight())
+        if not here:
+            continue
+        print(f"\n## {scope}")
+        for l in here:
+            age = days_since(l.fm.get("last_confirmed"))
+            flags = []
+            if age is not None and age > cfg.lesson_stale_days:
+                flags.append(f"STALE {age}d")
+            if l.confirmations == 0 and (age or 0) > cfg.lesson_stale_days // 2:
+                flags.append("NEVER CONFIRMED")
+            if hidden_from[l.id]:
+                flags.append("BELOW THE BUDGET, never reaches: " + ", ".join(hidden_from[l.id]))
+            still_open = [t for t in (str(x) for x in l.listfield("tickets"))
+                          if by_ticket_status.get(t) not in (None, "done", "cancelled",
+                                                             "wontfix", "cannot_reproduce")]
+            if still_open:
+                flags.append("ticket still open: " + ", ".join(still_open))
+            print(f"  {l.id}  x{l.confirmations}  {l.fm.get('last_confirmed')}  "
+                  f"{'[' + '; '.join(flags) + ']' if flags else ''}")
+            print(f"      {l.rule}")
+
+    issues = [i for i in validate(root, lessons, arts)
+              if i.level == "WARN" and i.field in ("rule", "last_confirmed")]
+    if issues:
+        print("\nWhat lint already suspects:")
+        for i in issues:
+            print(f"  {i.rel}\n    {i.msg}")
+    print("\nNothing here is a verdict. Resolve each with confirm, retire or supersede.")
+    return 0
+
+
 def cmd_index(root: str, lessons: list[Lesson], arts) -> int:
     issues = validate(root, lessons, arts) + ticket_lesson_issues(root, lessons, arts)
     path = os.path.join(lessons_dir(root), "INDEX.md")
@@ -846,6 +905,8 @@ def main(argv: list[str]) -> int:
         return cmd_new(root, lessons, arts, args[1:])
     if cmd == "confirm":
         return cmd_confirm(root, lessons, arts, args[1:])
+    if cmd == "audit":
+        return cmd_audit(root, lessons, arts)
     if cmd == "index":
         return cmd_index(root, lessons, arts)
     if cmd == "lint":

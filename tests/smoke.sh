@@ -306,6 +306,28 @@ printf '%s' "$OUT" | grep -q "withheld" \
 [ "$(printf '%s' "$OUT" | grep -c '^  LESSON-')" = 1 ] \
   && ok "the budget is a hard cap" || bad "the budget did not cap"
 
+want 0 "audit prints the decision queue" -- python3 .claude/scripts/lessons.py audit
+python3 .claude/scripts/lessons.py audit | grep -q "Nothing here is a verdict" \
+  && ok "audit decides nothing on its own" || bad "audit skipped its own disclaimer"
+python3 .claude/scripts/lessons.py audit --budget 2>/dev/null | head -1 >/dev/null
+OUT="$(python3 - <<'PY2'
+import json, subprocess
+c = json.load(open("forge.json")); c["policy"]["lesson_budget"] = 1
+json.dump(c, open("forge.json", "w"), indent=2)
+print(subprocess.run(["python3", ".claude/scripts/lessons.py", "audit"],
+                     capture_output=True, text=True).stdout)
+c["policy"]["lesson_budget"] = 12
+json.dump(c, open("forge.json", "w"), indent=2)
+PY2
+)"
+printf '%s' "$OUT" | grep -q "BELOW THE BUDGET" \
+  && ok "audit names the rules the budget hides" || bad "audit hid the hidden rules"
+
+for c in new retro lint; do
+  [ -f ".claude/commands/lessons/$c.md" ] && ok "/lessons:$c is installed" \
+    || bad "/lessons:$c is missing"
+done
+
 want 0 "confirm bumps the counter" -- python3 .claude/scripts/lessons.py confirm LESSON-0002
 grep -q "confirmations: 1" docs/lessons/all/*.md \
   && ok "the confirmation is written back" || bad "confirm did not persist"

@@ -56,6 +56,9 @@ arrives.
   "spec_first": true,          // the cycle's speccing stage, and gate 1
   "test_first": true,          // the cycle's writing_tests stage
   "require_docs": true,        // the docs:/NO-DOCS gate at review
+  "require_lessons": true,     // the lessons:/NO-LESSON gate at verify
+  "lesson_budget": 12,         // rules handed to one agent at the top of a gate
+  "lesson_stale_days": 180,    // when lint asks for a rule to be confirmed or retired
   "stale_claim_hours": 24,     // when lint warns about an abandoned claim
   "models": {                  // the tier each rendered agent runs on
     "pm": "opus", "qa": "sonnet", "qa_spec": "opus", "engineer": "sonnet"
@@ -67,6 +70,13 @@ arrives.
 `require_docs: false` turns the knowledge-base gate into a convention instead of
 a check. Think twice: it is the gate that stops a codebase relearning the same
 rule every quarter.
+
+`require_lessons: false` does the same to the lessons gate. `lesson_budget` is
+the one number to tune rather than switch off: it is how many one-line rules
+reach a single agent at the top of a gate, and raising it past a dozen or so
+stops being free — everything handed over is context the agent does not spend on
+the ticket, and a hand-off nobody finishes reading enforces nothing. If a scope
+is permanently over budget, `/lessons:retro` is the answer, not a bigger number.
 
 `spec_first: false` lets a ticket reach `writing_tests` with no agreed brief,
 and restores the old `todo -> writing_tests` edge. **It exists for one
