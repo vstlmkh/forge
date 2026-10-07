@@ -303,6 +303,9 @@ OUT="$(python3 .claude/scripts/lessons.py for api-engineer --budget 1)"
 printf '%s' "$OUT" | grep -q "withheld" \
   && ok "the budget caps the hand-off and says what it withheld" \
   || bad "the budget truncated in silence"
+[ "$(printf '%s' "$OUT" | grep -c 'LESSON-')" -le 7 ] \
+  && ok "the withheld line cannot grow without bound" \
+  || bad "the withheld line enumerates everything it withheld"
 [ "$(printf '%s' "$OUT" | grep -c '^  LESSON-')" = 1 ] \
   && ok "the budget is a hard cap" || bad "the budget did not cap"
 

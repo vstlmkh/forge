@@ -565,7 +565,13 @@ def cmd_for(root: str, lessons: list[Lesson], argv: list[str]) -> int:
             line += f"\n      {l.rel}"
         print(line)
     if withheld:
-        print(f"  (withheld: {', '.join(l.id for l in withheld)})")
+        # Naming all of them would make this line grow without bound, which is
+        # the thing the budget exists to prevent. The count is the part that
+        # must never be dropped; the ids are a courtesy.
+        named = withheld[:5]
+        tail = f", and {len(withheld) - len(named)} more" if len(withheld) > len(named) else ""
+        print(f"  (withheld: {', '.join(l.id for l in named)}{tail} - "
+              f"`lessons.py list` shows all of them)")
     print("Why one of them exists: python3 .claude/scripts/lessons.py show <LESSON-NNNN>")
     return 0
 
