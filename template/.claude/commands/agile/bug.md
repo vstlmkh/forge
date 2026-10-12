@@ -31,6 +31,10 @@ determine yourself. Do not invent a reproduction.
 python3 .claude/scripts/agile.py next-id bug
 ```
 
+Writing the file asks you to approve it first: a bug joins the board only if
+the operator says so, and the prompt carries the ID, the severity and the
+title. Declined, it is reported in one line and filed nowhere.
+
 Write `docs/agile/bugs/<ID>-<kebab-slug>.md` with the full bug frontmatter from
 `docs/agile/SCHEMA.md`: `status: triage`, `reported_by`, `found_in`, and
 `severity` left for triage if you genuinely cannot judge it. Fill

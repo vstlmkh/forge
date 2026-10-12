@@ -172,7 +172,7 @@ row is a reviewable diff. **An unavailable check is recorded as
 makes a check real, flipping its `available` flag is part of that ticket's own
 acceptance criteria — so the gate tightens itself as the tooling lands.
 
-## Ticket hygiene, in four rules
+## Ticket hygiene, in five rules
 
 1. **Never edit `INDEX.md`.** Edit the ticket; the board regenerates. A hook will
    stop you anyway.
@@ -182,6 +182,14 @@ acceptance criteria — so the gate tightens itself as the tooling lands.
    output, or a file and a line, in `## Log`.
 4. **Allocate IDs with the script.** `agile.py next-id task`. Never guess, never
    reuse.
+5. **The operator opens the ticket, not the agent.** Creating a file under
+   `backlog/`, `tasks/` or `bugs/` is put to the operator by a `PreToolUse`
+   hook before it is written, with the ID, the scope and the title in the
+   prompt. Editing an existing ticket is untouched. The board is meant to be
+   the set of things the project decided to do, not the set of things an agent
+   noticed on the way past; a denial means the ticket is reported in one line
+   and not filed anywhere else. A project that wants the old behaviour sets
+   `"ticket_consent": "off"` under `policy` in `forge.json`.
 
 ## The scripts
 

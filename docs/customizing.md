@@ -60,6 +60,7 @@ arrives.
   "lesson_budget": 12,         // rules handed to one agent at the top of a gate
   "lesson_stale_days": 180,    // when lint asks for a rule to be confirmed or retired
   "stale_claim_hours": 24,     // when lint warns about an abandoned claim
+  "ticket_consent": "ask",     // "off" lets an agent open a ticket unprompted
   "models": {                  // the tier each rendered agent runs on
     "pm": "opus", "qa": "sonnet", "qa_spec": "opus", "engineer": "sonnet"
   }
@@ -84,6 +85,17 @@ situation**: `forge upgrade` sets it on a project that has tickets in flight, so
 that the new invariants arrive as warnings rather than turning a healthy board
 red mid-ticket. `agile.py lint` names the tickets that would fail and
 `forge doctor` keeps asking; turn it on once the board has drained.
+
+`ticket_consent: "off"` removes the prompt an operator gets before a *new*
+ticket is written under `backlog/`, `tasks/` or `bugs/` — the one that carries
+the ID, the scope and the title. The default asks, because an agent opens
+tickets far more readily than a person does: a `qa` run that trips over an
+unrelated defect, a `pm` that splits one request into six tasks, an engineer
+that spots a follow-up. Each is defensible on its own and collectively they turn
+the board from the set of things the project decided to do into the set of
+things an agent noticed. Turn it off for an unattended project, where nobody is
+there to answer and the prompt would simply stall the run. Editing an existing
+ticket is never prompted.
 
 `models` chooses the tier each rendered agent runs on, and takes effect on
 `forge agents --force`. Gate 1 is the only gate that is pure judgement — there

@@ -23,7 +23,10 @@ The PM must:
 3. Choose the shape: a single task, a story with one task per scope, or a new
    epic. Never create an empty container. `python3 .claude/scripts/forge.py
    scopes` is the authority on which scopes exist.
-4. Allocate IDs with `python3 .claude/scripts/agile.py next-id <kind>`.
+4. Allocate IDs with `python3 .claude/scripts/agile.py next-id <kind>`. The
+   write that creates each artifact is put to you first — a hook turns it into
+   a prompt carrying the ID, the scope and the title, so the shape the PM chose
+   is approved one row at a time. A declined row is not filed anywhere else.
 5. Write complete frontmatter per `docs/agile/SCHEMA.md` and observable
    acceptance criteria, filling `## Verification` only with commands that
    `python3 .claude/scripts/forge.py checks <scope>` lists.
@@ -37,6 +40,6 @@ The PM must:
    `python3 .claude/scripts/kb.py lint` until both are clean.
 8. Commit: `chore(agile): opens <IDs>`.
 
-Then report to the user, in a few lines: the IDs created, the shape chosen and
-why, which knowledge-base notes informed them, what the knowledge base turned
+Then report to the user, in a few lines: the IDs created, anything declined at
+the prompt and what it was for, the shape chosen and why, which knowledge-base notes informed them, what the knowledge base turned
 out not to know, and every assumption made.

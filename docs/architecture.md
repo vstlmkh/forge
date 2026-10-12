@@ -122,6 +122,7 @@ every gate 3.
 |---|---|---|
 | `guard-index.py` | `PreToolUse` | denies a hand-edit of any generated `INDEX.md` |
 | `guard-kb.py` | `PreToolUse` | denies a misfiled or misnamed note, a new ticket with no `docs:` or no `spec:`, a spec not named after an existing ticket, and writes under a disowned knowledge directory |
+| `guard-ticket.py` | `PreToolUse` | asks the operator before a *new* ticket is written, so the board stays the project's decisions rather than an agent's observations (`policy.ticket_consent`) |
 | `kb-nudge.py` | `PostToolUse` | catches a ticket moved to `review`/`done` with an empty `docs:`, while the agent still has the context to file the note |
 | `kb-context.py` | `UserPromptSubmit` | injects the knowledge base's coverage when a cycle command starts, so consulting it is cheap at the one moment it matters |
 | `lesson-nudge.py` | `PostToolUse` | catches a ticket moving *backwards* and asks for the lesson while the agent still knows why it bounced |

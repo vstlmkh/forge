@@ -89,6 +89,9 @@ this gate is the only thing standing between "deferred" and "forgotten".
    thing you may edit in the spec.**
 3. A row that should never become work gets `NO-TICKET (<reason>)` there
    instead, argued. "Probably unnecessary" is not an argument.
+   The operator is asked before each new ticket is written, so a row they
+   decline gets the same cell treatment: `NO-TICKET (declined by the operator)`,
+   and the reason they gave if they gave one.
 4. Roll the parent story up if this was its last open child.
 5. `python3 .claude/scripts/agile.py lint`, then commit and report the ids.
 

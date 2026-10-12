@@ -28,6 +28,26 @@ Only `pm` creates artifacts. The one exception is `qa`, which files bugs — and
 `qa` must call `next-id bug` immediately before writing the file, with the write
 as the last thing it does, so the window for an ID collision stays near zero.
 
+### The operator decides what goes on the board
+
+The write that creates a ticket is handed to the operator by a `PreToolUse`
+hook: they see the ID, the scope and the title, and they answer. Nothing else
+about the ticket changes — once it exists, every later edit of it is yours.
+
+What this asks of you:
+
+- **Make the first write the real ticket.** The operator is answering about
+  the file in front of them, so the frontmatter and the title have to be worth
+  reading before they are approved. Do not write a stub and fill it in after.
+- **A denial is an answer, not an obstacle.** Do not write the ticket again, do
+  not move it to another path, do not record it in the knowledge base or a
+  lesson instead. Say in one line what you would have filed and why, and carry
+  on with the work you were doing. A board the operator did not choose is the
+  thing this prevents.
+- **A batch is answered one ticket at a time.** If a story decomposes into four
+  tasks and the operator approves two, the two approved ones are the story —
+  renumber nothing, and say which rows did not make it.
+
 ## The claim protocol — a compare-and-swap, not a lock
 
 **`qa` claims, not the engineer.** A ticket leaves `todo` into `speccing`, held

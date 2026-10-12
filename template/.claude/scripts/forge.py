@@ -72,6 +72,10 @@ LESSON_ALL = "all"
 DEFAULT_LESSON_BUDGET = 12
 DEFAULT_LESSON_STALE_DAYS = 180
 
+# Whether a new ticket needs the operator's yes before it is written. The board
+# is the project's decisions, not an agent's observations, so the default asks.
+TICKET_CONSENT = ("ask", "off")
+
 
 class ConfigError(Exception):
     pass
@@ -205,6 +209,11 @@ class Config:
         self.lesson_budget = int(policy.get("lesson_budget", DEFAULT_LESSON_BUDGET))
         self.lesson_stale_days = int(policy.get("lesson_stale_days",
                                                 DEFAULT_LESSON_STALE_DAYS))
+        # Who gets to put a ticket on the board. "ask" - the default - makes
+        # `guard-ticket.py` hand every *new* ticket to the operator before it is
+        # written; "off" lets an agent open one unprompted, which is how a board
+        # fills with things an agent noticed rather than things the project chose.
+        self.ticket_consent = str(policy.get("ticket_consent", "ask")).strip().lower()
         self.models = dict(policy.get("models") or {})
 
     def model_for(self, role: str) -> str:
@@ -352,6 +361,10 @@ class Config:
         if not os.path.isdir(self.lessons_dir()):
             out.append(f"paths.lessons: {self.lessons_rel}/ does not exist - "
                        "run `forge upgrade` to create it")
+        if self.ticket_consent not in TICKET_CONSENT:
+            out.append(f"policy.ticket_consent: '{self.ticket_consent}' is not one of "
+                       f"{sorted(TICKET_CONSENT)} - the guard treats anything but 'off' "
+                       "as 'ask'")
         if self.lesson_budget < 1:
             out.append("policy.lesson_budget: must be at least 1 - set "
                        "policy.require_lessons false to switch the layer off instead")

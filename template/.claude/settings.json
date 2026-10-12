@@ -16,6 +16,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/guard-ticket.py\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [

@@ -34,7 +34,7 @@ import sys
 # into ~/.forge, and template/ has to be found relative to the real file.
 HERE = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 TEMPLATE = os.path.join(HERE, "template")
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 FORGE_NAME = "forge"
 FORGE_URL = "https://github.com/vstlmkh/forge"
 
@@ -401,7 +401,8 @@ def assemble(project: str, repos: dict, scopes: dict, checks: dict,
         },
         "policy": {"test_first": True, "spec_first": True, "require_docs": True,
                    "require_lessons": True, "lesson_budget": 12,
-                   "lesson_stale_days": 180, "stale_claim_hours": 24},
+                   "lesson_stale_days": 180, "stale_claim_hours": 24,
+                   "ticket_consent": "ask"},
     }
 
 
@@ -616,6 +617,20 @@ def render_claude_block(cfg: dict) -> str:
             if f"`{one}`" not in agents:
                 agents.append(f"`{one}`")
 
+    # The operator-consent rule is stated only where it is in force: a project
+    # that set policy.ticket_consent to "off" would otherwise carry a bullet
+    # describing a prompt that never appears.
+    consent = ""
+    tracker = ((cfg.get("paths") or {}).get("tracker") or "docs/agile").strip("/")
+    if str(((cfg.get("policy") or {}).get("ticket_consent") or "ask")).lower() != "off":
+        consent = (
+            "- **The operator decides what goes on the board.** Creating a ticket under\n"
+            f"  `{tracker}/{{backlog,tasks,bugs}}/` is put to them by a `PreToolUse` hook\n"
+            "  before the file is written; editing an existing one is not. A declined\n"
+            "  ticket is reported in one line and filed nowhere else - not renamed, not\n"
+            "  moved, not turned into a note or a lesson. The board is the set of things\n"
+            "  this project decided to do, not the set of things an agent noticed.\n")
+
     forbidden = (cfg.get("kb") or {}).get("forbidden_dirs") or []
     callout = ""
     if forbidden:
@@ -633,6 +648,7 @@ def render_claude_block(cfg: dict) -> str:
             .replace("{{AGENT_LIST}}", ", ".join(agents))
             .replace("{{SCOPE_LIST}}", ", ".join(f"`{k}`" for k in scopes))
             .replace("{{KB_CALLOUT}}", callout)
+            .replace("{{CONSENT_RULE}}", consent)
             .replace("{{CREDIT}}", credit(cfg, "markdown")))
 
 

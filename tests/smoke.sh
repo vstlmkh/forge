@@ -528,6 +528,13 @@ cmp -s /tmp/forge-index-a docs/agile/INDEX.md && ok "agile index is byte-stable"
   || bad "agile index is not byte-stable"
 
 echo "== hooks"
+grep -q "The operator decides what goes on the board" CLAUDE.md \
+  && ok "the managed CLAUDE.md block states the consent rule" \
+  || bad "CLAUDE.md does not state the consent rule"
+grep -q "guard-ticket.py" .claude/settings.json \
+  && ok "settings.json registers the ticket-consent hook" \
+  || bad "settings.json does not run guard-ticket.py"
+
 hook() { printf '%s' "$2" | python3 ".claude/scripts/$1" >/dev/null 2>&1; echo $?; }
 [ "$(hook guard-index.py '{"tool_input":{"file_path":"docs/agile/INDEX.md"}}')" = 2 ] \
   && ok "guard-index denies editing the board" || bad "guard-index let the board through"
@@ -550,6 +557,35 @@ hook() { printf '%s' "$2" | python3 ".claude/scripts/$1" >/dev/null 2>&1; echo $
   || bad "guard-kb allowed an orphan spec"
 [ "$(hook guard-kb.py '{"tool_input":{"file_path":"docs/agile/specs/TASK-0001.md"}}')" = 0 ] \
   && ok "guard-kb allows a real spec" || bad "guard-kb blocked a real spec"
+NEWTICKET='{"tool_input":{"file_path":"docs/agile/tasks/TASK-0042-new.md","content":"---\nid: TASK-0042\ntitle: Something an agent noticed\nscope: api\n---\n"}}'
+ask() { printf '%s' "$1" | python3 .claude/scripts/guard-ticket.py 2>/dev/null; }
+ask "$NEWTICKET" | grep -q '"permissionDecision": "ask"' \
+  && ok "guard-ticket asks the operator before a new ticket" \
+  || bad "guard-ticket let a new ticket through unasked"
+ask "$NEWTICKET" | grep -q "TASK-0042" \
+  && ok "the prompt names the ticket it is asking about" \
+  || bad "the prompt does not name the ticket"
+[ -z "$(ask '{"tool_input":{"file_path":"docs/agile/tasks/TASK-0001-first-task.md","content":"x"}}')" ] \
+  && ok "guard-ticket is silent on an existing ticket" \
+  || bad "guard-ticket asked about an edit of an existing ticket"
+[ -z "$(ask '{"tool_input":{"file_path":"docs/agile/specs/TASK-0001.md","content":"x"}}')" ] \
+  && ok "guard-ticket is silent outside the ticket folders" \
+  || bad "guard-ticket asked about a file that is not a ticket"
+python3 - <<'PY2'
+import json
+c = json.load(open("forge.json"))
+c.setdefault("policy", {})["ticket_consent"] = "off"
+json.dump(c, open("forge.json", "w"), indent=2)
+PY2
+[ -z "$(ask "$NEWTICKET")" ] \
+  && ok "policy.ticket_consent off restores the unprompted board" \
+  || bad "ticket_consent off still prompted"
+python3 - <<'PY2'
+import json
+c = json.load(open("forge.json"))
+c["policy"].pop("ticket_consent")
+json.dump(c, open("forge.json", "w"), indent=2)
+PY2
 BOUNCE='{"tool_input":{"file_path":"docs/agile/tasks/TASK-0001-first-task.md","old_string":"status: review","new_string":"status: in_progress"}}'
 [ "$(hook lesson-nudge.py "$BOUNCE")" = 2 ] \
   && ok "lesson-nudge fires on a bounce" || bad "lesson-nudge missed a bounce"
