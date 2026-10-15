@@ -195,24 +195,31 @@ want 0 "handoff renders gate 1" -- python3 .claude/scripts/agile.py handoff TASK
 want 2 "handoff refuses a gate the ticket cannot reach" -- \
   python3 .claude/scripts/agile.py handoff TASK-0001 --gate 4
 OUT="$(python3 .claude/scripts/agile.py handoff TASK-0001 --gate 1)"
-printf '%s' "$OUT" | head -2 | grep -q "GATE 1" \
+printf '%s' "$OUT" | head -2 | grep -q '<gate n="1"' \
   && ok "the contract opens the payload" || bad "handoff buried the contract"
-printf '%s' "$OUT" | head -20 | grep -q "MUST NOT" \
+printf '%s' "$OUT" | head -20 | grep -q "<must_not>" \
   && ok "the prohibitions are in the first screen" || bad "the prohibitions are not up front"
-printf '%s' "$OUT" | tail -20 | grep -q "ANCHOR" \
+printf '%s' "$OUT" | tail -20 | grep -q "<anchor" \
   && ok "the contract is repeated in the last screen" || bad "handoff lost the anchor"
 # nothing inert may follow the anchor - that is the whole layout rule
-printf '%s' "$OUT" | sed -n '/=== ANCHOR/,$p' | grep -qE '^--- (reference|steps)' \
+printf '%s' "$OUT" | sed -n '/<anchor/,$p' | grep -qE '^<(reference|steps|quoted)' \
   && bad "reference material follows the anchor" \
   || ok "the anchor is the last thing in the payload"
+printf '%s' "$OUT" | grep -q '^</gate>$' \
+  && ok "the payload closes the gate element" || bad "the payload is not well formed"
 printf '%s' "$OUT" | grep -q "api" \
   && ok "handoff reads the scope from forge.json" || bad "handoff did not resolve the scope"
 printf '%s' "$OUT" | grep -q "Prove the pipeline end to end" \
   && bad "handoff pasted the ticket body instead of its path" \
   || ok "handoff carries paths, not pasted file bodies"
-printf '%s' "$OUT" | grep -q "spec ## Questions" \
+printf '%s' "$OUT" | grep -q 'section="## Questions"' \
   && ok "gate 1 renders the answers back from the file" \
   || bad "gate 1 did not carry the answers"
+# quoted material names the file it came from, so an agent can tell what it was
+# told from what it was shown - and can go and read the rest of it
+printf '%s' "$OUT" | grep -q '<quoted source="docs/agile/specs/' \
+  && ok "quoted blocks name their source file" \
+  || bad "the payload quotes a file without saying which"
 
 echo "== handback: what actually came back"
 want 1 "handback needs a gate" -- python3 .claude/scripts/agile.py handback TASK-0001
@@ -309,10 +316,10 @@ python3 .claude/scripts/lessons.py for api-engineer | grep -q "LESSON-0001" \
 # gate 3 is the engineer's, which is who this rule addresses; handoff still renders
 # the payload when the ticket cannot reach the gate, which is all this needs.
 OUT="$(python3 .claude/scripts/agile.py handoff TASK-0001 --gate 3)"
-printf '%s' "$OUT" | grep -q "THIS PROJECT HAS LEARNED" \
+printf '%s' "$OUT" | grep -q "<this_project_has_learned" \
   && ok "the handoff renders the lessons into the payload" \
   || bad "the payload left the lessons to a command the agent may skip"
-printf '%s' "$OUT" | sed -n '/THIS PROJECT HAS LEARNED/,$p' | grep -q "^--- reference" \
+printf '%s' "$OUT" | sed -n '/<this_project_has_learned/,$p' | grep -q "^<reference" \
   && ok "the lesson block sits in the binding half, before the reference" \
   || bad "the lesson block landed after the reference material"
 python3 .claude/scripts/lessons.py for pm | grep -q "none recorded yet" \

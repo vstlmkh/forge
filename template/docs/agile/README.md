@@ -139,6 +139,10 @@ python3 .claude/scripts/agile.py handoff TASK-0231 --gate 3
 prompt with the binding instructions first and repeated last, and the reference
 material in between as paths and commands rather than pasted files. An
 instruction in the middle of a long prompt is one that will not be followed.
+The parts are tagged — `<contract>`, `<must_not>`, `<reference>`, `<steps>`,
+`<anchor>`, and a `<quoted>` block for anything lifted out of a file, naming
+that file and section — so that an agent can tell what it was told to do from
+what it was merely shown.
 
 A ticket that has not been through `qa` cannot reach `verify`, and a ticket that
 is not in `verify` cannot be closed. Both rules are checked by the validator, not

@@ -178,6 +178,29 @@ engineer.** Never reject with a judgement alone, and never fix the production
 code yourself — that collapses the separation that makes the verdict worth
 anything.
 
+What that looks like on the page — the entry on the left is the whole brief for
+the next dispatch, the one below it reaches nobody:
+
+```
+REJECTED G4: REQ-0003 — rounding is applied before the discount, not after.
+
+  $ npm test -w api -- pricing.spec.ts
+  ● applies the discount to the rounded total
+    expected 1899, received 1900
+    at src/pricing/total.ts:41
+
+  src/pricing/total.ts:41 rounds, then subtracts; REQ-0003 says the discount
+  comes off first. Test files unchanged since a1b2c3d.
+```
+
+```
+REJECTED G4: the pricing logic looks wrong, please have another look.
+```
+
+The second names no command, no output and no REQ, so the engineer is
+re-dispatched into exactly the guess that produced the defect. A rejection is
+reproducible or it is not a rejection.
+
 The one thing QA may edit is a test it wrote itself, and only via
 `writing_tests`, never silently while the ticket sits in `review`. If the
 engineer argued the test is wrong and QA agrees, the honest move is to say so in

@@ -38,15 +38,28 @@ layer is in git. **If you find yourself wanting to add a paragraph, the paragrap
 belongs in a file** — put it there and re-run `handoff`.
 
 The layout it produces is the point too. The binding instructions sit in the
-first screen and are repeated, compressed, in the last; the reference material
-sits between them as paths and commands rather than pasted file contents. **An
+first screen inside `<contract>` and `<must_not>`, and are repeated, compressed,
+in the closing `<anchor>`; the reference material sits between them as paths and
+commands rather than pasted file contents, and anything lifted out of a file
+arrives in a `<quoted>` block naming the file and the section it came from. **An
 instruction buried in the middle of a long prompt is an instruction that will not
-be followed** — so do not "tidy" the payload by moving the anchor or splicing a
-preamble in front of the contract.
+be followed** — so do not "tidy" the payload by moving the anchor, stripping the
+tags or splicing a preamble in front of the contract. The tags are what let the
+agent tell an instruction it must obey from a brief it was merely shown.
 
 If `handoff` exits 2 it prints `BLOCKED` and names the transition that is
 missing: the ticket is not where that gate runs. Fix the ticket's state or stop
 — do not dispatch anyway.
+
+**The six gates are the only delegation boundary in this command.** Dispatch the
+agent the gate names, with the payload the gate builds, and nothing else — no
+extra explorer to read the codebase for you first, no second agent to split a
+gate in half, no helper to summarise a report. Each of those produces findings
+that live in your context and in no file, which is the one thing this cycle is
+built to prevent; and the gate's owner is the agent whose prohibitions and
+lessons were rendered into that payload. If you need to read something yourself
+before dispatching, read it yourself — a `grep` is faster than a subagent and it
+leaves you holding the result.
 
 ## How you check every gate before you believe it
 
@@ -62,6 +75,11 @@ it back — not to dispatch the next gate over a gap.
 
 It runs nothing, and it says so: the lines marked `not checked here` are the ones
 you still have to read the subagent's report for.
+
+Then say one line to the user before the next dispatch: which gate landed, what
+it produced, and what goes out next. This cycle is six dispatches long and the
+user is watching a cursor for most of it — a run that reports only at the end
+cannot be interrupted at the point where interrupting it would have been cheap.
 
 ## 1. Preflight — you do this yourself, before dispatching anyone
 

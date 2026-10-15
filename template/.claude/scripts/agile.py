@@ -1121,6 +1121,11 @@ GATES = {
             "implement a requirement that is not in '## Brief'. If the work needs "
             "one, say so in '## Log' and hand back - a requirement that enters "
             "here was never grilled.",
+            "make the tests pass by special-casing them - a value hard-coded to "
+            "the fixture, a branch keyed on test input, logic that holds only for "
+            "the inputs qa chose. Implement what '## Brief' describes, for every "
+            "valid input; a green suite is the one thing that cannot tell you "
+            "which of the two you did.",
             "touch another scope's code: {others}.",
             "report a check as passing when it did not run, or move past review.",
         ],
@@ -1164,6 +1169,9 @@ GATES = {
             "edit a test while the ticket is in review. If it is wrong, move the "
             "ticket back and prove it red again.",
             "accept a criterion that is merely plausible from reading the diff.",
+            "pass a diff that satisfies your tests by special-casing them - a "
+            "value hard-coded to your fixture, a branch keyed on your input. Read "
+            "the implementation, not only the result it produced.",
             "pass a requirement that is still 'assumed' in the brief without "
             "saying so - it was never put to the user.",
             "merge, bump a submodule pointer, or set done.",
@@ -1852,7 +1860,9 @@ def _lesson_block(root: str, owner: str) -> list[str]:
         return []
     if not shown:
         return []
-    out = ["", "THIS PROJECT HAS LEARNED (obey these the way you obey the contract above):"]
+    out = ["",
+           '<this_project_has_learned note="obey these the way you obey the '
+           'contract above">']
     for l in shown:
         out.append(f"  {l.id}  {l.rule}")
     if withheld:
@@ -1863,6 +1873,7 @@ def _lesson_block(root: str, owner: str) -> list[str]:
                    f"gives the reasoning behind a line.)")
     else:
         out.append("  (`lessons.py show <ID>` gives the reasoning behind a line.)")
+    out.append("</this_project_has_learned>")
     return out
 
 
@@ -1870,12 +1881,20 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
                    max_log: int = 3) -> list[str]:
     """The dispatch payload for one gate.
 
-    The layout is fixed and is the point: CONTRACT and PROHIBITIONS first,
-    inert REFERENCE in the middle, the same contract compressed again last.
-    An instruction buried in the middle of a long prompt is an instruction that
-    will not be followed, so nothing binding is ever placed there - and the
-    reference half carries paths and commands rather than pasted file bodies,
-    which is also what keeps the payload small.
+    Two things about the layout are deliberate.
+
+    The *order* is fixed: contract and prohibitions first, inert reference in
+    the middle, the same contract compressed again last. An instruction buried
+    in the middle of a long prompt is an instruction that will not be followed,
+    so nothing binding is ever placed there - and the reference half carries
+    paths and commands rather than pasted file bodies, which is also what keeps
+    the payload small.
+
+    The *tags* are there because this payload mixes two kinds of text that must
+    never be confused: instructions the agent obeys, and material quoted out of
+    the repository - a brief, the user's own words, a log tail. Every quoted
+    block names its file and section in a <quoted> tag, so the agent can always
+    tell what it was told from what it was shown, and can go read the rest.
     """
     g = GATES[n]
     ctx = gate_context(root, a, cfg)
@@ -1885,29 +1904,41 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
     owner = gate_owner(g, ctx)
     spec = _spec_of(root, a.id)
     out: list[str] = []
-    bar = "=" * 70
+
+    def quoted(source: str, section: str, body: list[str], **attrs) -> None:
+        """A block lifted out of a file, labelled with where it came from."""
+        extra = "".join(f' {k}="{v}"' for k, v in attrs.items())
+        out.append("")
+        out.append(f'<quoted source="{source}" section="{section}"{extra}>')
+        out.extend(body)
+        out.append("</quoted>")
 
     # ---- 1. the contract -------------------------------------------------
-    out.append(f"=== GATE {n} of {len(GATES)} — {g['name']} — {a.id} {'=' * 10}")
-    out.append(f"YOU ARE: {owner}.")
+    out.append(f'<gate n="{n}" of="{len(GATES)}" ticket="{a.id}" '
+               f'name="{g["name"]}">')
+    out.append(f"<you_are>{owner}</you_are>")
+    out.append("")
+    out.append("<contract>")
     out += _wrap(f"ENTRY:    {sub(g['entry'])}")
     out += _wrap(f"YOU OWE:  {sub(g['artifact'])}")
     out += _wrap(f"EXIT:     {sub(g['exit'])}")
     out += _wrap(f"FAILURE:  {sub(g['failure'])}")
     out += _wrap(f"WAIVER:   {sub(g['waiver'])}")
+    out.append("</contract>")
 
     # ---- 2. the prohibitions ---------------------------------------------
     out.append("")
-    out.append("MUST NOT:")
+    out.append("<must_not>")
     for p in g["prohibitions"]:
         out += _bullet(sub(p))
+    out.append("</must_not>")
 
     # ---- 2b. what the project has already paid for -----------------------
     out += _lesson_block(root, owner)
 
     # ---- 3. the reference ------------------------------------------------
     out.append("")
-    out.append("--- reference (read these yourself; they are not pasted here) ---")
+    out.append('<reference note="read these yourself; they are not pasted here">')
     out.append(f"ticket    {a.rel}")
     if spec is not None:
         out.append(f"spec      {spec.rel}")
@@ -1947,17 +1978,16 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
         repo = ctx["repo"]
         out.append(f"tests     git -C {repo} diff --name-only "
                    f"<base>...{a.fm.get('branch')}   # qa's test files")
+    out.append("</reference>")
 
     if spec is not None:
         if n in (1, 2, 3, 4):
             rows = [r for r in table_rows(spec.section("Brief") or "")
                     if r and REQ_RE.match(r[0]) and (len(r) < 3 or r[2] != "dropped")]
             if rows:
-                out.append("")
-                out.append("spec ## Brief")
-                for r in rows:
-                    status = r[2] if len(r) > 2 else "?"
-                    out.append(f"  {r[0]}  [{status}]  {r[1] if len(r) > 1 else ''}")
+                quoted(spec.rel, "## Brief",
+                       [f"  {r[0]}  [{r[2] if len(r) > 2 else '?'}]  "
+                        f"{r[1] if len(r) > 1 else ''}" for r in rows])
         # Gate 1 runs twice - before the questions and after them - and the
         # answers are the one thing in this payload that the repository could
         # not reconstruct. Rendering them from the file is what lets the second
@@ -1967,66 +1997,67 @@ def render_handoff(root: str, a: Artifact, n: int, cfg,
             rows = [r for r in table_rows(spec.section("Questions") or "")
                     if r and not is_placeholder(r[0])]
             if rows:
-                out.append("")
-                out.append("spec ## Questions")
+                body: list[str] = []
                 for r in rows:
                     # The cell escapes a pipe so the table survives; the payload
                     # is prose, and must show the user's words as they were said.
                     answer = ("" if len(r) < 4 or is_placeholder(r[3])
                               else r[3].replace("\\|", "|"))
-                    out.append(f"  {r[0]}  blocks {r[1] if len(r) > 1 else '?'}: "
-                               f"{r[2] if len(r) > 2 else ''}")
-                    out.append(f"      answer: {answer or '(still open - do not guess it)'}")
+                    body.append(f"  {r[0]}  blocks {r[1] if len(r) > 1 else '?'}: "
+                                f"{r[2] if len(r) > 2 else ''}")
+                    body.append(f"      answer: "
+                                f"{answer or '(still open - do not guess it)'}")
+                quoted(spec.rel, "## Questions", body,
+                       note="the user's own words, from the file - nobody retyped them")
         if n in (2, 3, 5):
-            body = (spec.section("Spec") or "").strip()
-            if body:
-                out.append("")
-                out.append("spec ## Spec")
-                out += [f"  {l}" for l in body.splitlines()]
+            text = (spec.section("Spec") or "").strip()
+            if text:
+                quoted(spec.rel, "## Spec",
+                       [f"  {l}" for l in text.splitlines()])
         if n == 3:
             plan = [r for r in table_rows(spec.section("Plan") or "")
                     if r and r[0] == f"G{n}"]
             if plan:
-                out.append("")
-                out.append(f"spec ## Plan — your row: {' | '.join(plan[0])}")
+                quoted(spec.rel, "## Plan", [f"  {' | '.join(plan[0])}"],
+                       row="yours")
         if n == 6:
-            out.append("")
-            out.append("spec ## Carryover")
             rows = [r for r in table_rows(spec.section("Carryover") or "")
                     if r and REQ_RE.match(r[0])]
-            for r in rows:
-                out.append(f"  {r[0]}  because: {r[1] if len(r) > 1 else ''}  "
-                           f"becomes: {r[-1] if len(r) > 1 else ''}")
-            if not rows:
-                out.append("  (nothing deferred — report that and file nothing)")
-            out.append(f"parent    {a.fm.get('parent')}")
+            body = [f"  {r[0]}  because: {r[1] if len(r) > 1 else ''}  "
+                    f"becomes: {r[-1] if len(r) > 1 else ''}" for r in rows]
+            if not body:
+                body = ["  (nothing deferred — report that and file nothing)"]
+            body.append(f"  parent    {a.fm.get('parent')}")
+            quoted(spec.rel, "## Carryover", body)
 
     if n != 6:
         tail, kept, total = _log_tail(a, 0 if n == 1 else max_log)
         if kept:
-            out.append("")
-            out.append(f"## Log (last {kept} of {total})")
-            out += [f"  {l}" for l in tail.splitlines()]
+            quoted(a.rel, "## Log", [f"  {l}" for l in tail.splitlines()],
+                   showing=f"last {kept} of {total}")
         elif total and n != 1:
+            out.append("")
             out.append(f"log       {total} entries, none carried (--max-log 0)")
 
     # ---- 4. the steps ----------------------------------------------------
     out.append("")
-    out.append("--- steps ---")
+    out.append("<steps>")
     for i, step in enumerate(g["steps"], 1):
         lines = _wrap(sub(step), indent="    ")
         lines[0] = f"{i:2d}. " + lines[0].lstrip()
         out += lines
+    out.append("</steps>")
 
     # ---- 5. the anchor ---------------------------------------------------
     out.append("")
-    out.append(f"=== ANCHOR — re-read before you answer {'=' * 31}")
+    out.append('<anchor note="re-read before you answer">')
     out += _wrap(f"GATE {n}: {g['name']}. Exit: {sub(g['exit'])}.")
     for p in g["prohibitions"]:
         out += _bullet(f"do not {sub(p)}")
     out += _wrap(f"Failure route: {sub(g['failure'])}.")
     out.append("Finish with: agile.py lint and kb.py lint, both exit 0.")
-    out.append(bar)
+    out.append("</anchor>")
+    out.append("</gate>")
     return out
 
 

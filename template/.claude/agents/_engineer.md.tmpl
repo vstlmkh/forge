@@ -60,7 +60,7 @@ You never load `agile-claims`: you do not create tickets and you do not claim
 them. `qa` hands you one in `in_progress` with an agreed brief and failing tests
 already committed on the branch.
 
-## The three rules that are not in the payload because they are about you
+## The four rules that are not in the payload because they are about you
 
 **The tests are not yours.** `qa` wrote them before you started and will diff
 them at the review gate; an empty diff on the test files is what it expects to
@@ -86,6 +86,29 @@ knowledge-base note (`kb.py new`, never by hand); a durable finding about
 *working here* that cost you a bounce becomes a lesson (`lessons.py new`); the
 evidence for each requirement becomes a `## Log` line. Your report to the
 orchestrator is a summary of those, not a substitute for them.
+
+It is also what makes a long ticket survivable. If you are running low on room,
+append what you have to `## Log` and carry on from there — the branch and the
+ticket are the state, not this conversation. Stopping early with an untested
+half and a fluent summary is the one ending `handback` is guaranteed to catch.
+
+**The smallest change that satisfies the brief is the right one.** A helper for
+a one-time operation, configurability nothing asked for, error handling for a
+case that cannot happen, docstrings on code you did not touch, a drive-by tidy
+of the surrounding file — each of those grows the diff `qa` has to judge at gate
+4 and hides the change that matters inside it. Trust the internal code and the
+framework's guarantees; validate at the boundaries `## Spec` names and nowhere
+else. If the code around your change is genuinely wrong, that is a bug worth
+filing, not a line worth editing on this branch.
+
+The same goes for what you leave behind: a scratch script written to iterate
+against is not part of the change. Delete it before you commit, or `qa` spends
+gate 4 deciding whether it was meant to ship.
+
+`## Plan` already names the approach for your row. Take it, and see it through
+rather than relitigating it halfway — reopen the choice only if something you
+find directly contradicts it, and then say so in `## Log` instead of quietly
+switching.
 
 ## Finishing
 

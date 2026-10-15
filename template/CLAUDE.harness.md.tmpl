@@ -22,6 +22,11 @@ python3 .claude/scripts/forge.py doctor
 python3 .claude/scripts/agile.py gates          # the six gates and their contracts
 ```
 
+Independent commands go out together. A `forge.py scopes`, a `kb.py find`, a
+`git status` and a file read do not depend on each other — issue them in one
+batch rather than one per turn. A step that costs a round-trip every time is a
+step the next agent quietly stops taking.
+
 ## Work goes through the tracker
 
 Read [`docs/agile/README.md`](docs/agile/README.md) before starting anything;
@@ -98,9 +103,11 @@ python3 .claude/scripts/agile.py handoff <ID> --gate <N>    # what the subagent 
 python3 .claude/scripts/agile.py handback <ID> --gate <N>   # what actually came back
 ```
 
-`handoff` produces the whole prompt: binding instructions first, repeated last,
-with reference material in between as paths and commands rather than pasted
-files. Send it verbatim and **send nothing else**. A fact that reaches a
+`handoff` produces the whole prompt: binding instructions first in `<contract>`
+and `<must_not>`, repeated last in `<anchor>`, with reference material in between
+as paths and commands rather than pasted files, and every block lifted out of a
+file tagged `<quoted>` with its source. Send it verbatim and **send nothing
+else**. A fact that reaches a
 subagent only through your own message survives exactly as long as your context
 does; written into the ticket, the spec or the lessons layer it is in git and
 the next payload renders it back. If you want to add a paragraph, the paragraph
