@@ -105,11 +105,38 @@ check things do not.
 
 ## Two repositories, or twenty
 
-`repos` is a map of working trees. A monorepo declares one with `"path": "."`;
-a super-repo declares itself plus one entry per submodule. Scopes that share a
-repository share its working tree, and `lint` will not let two of them be in
-flight at once — that is a property of git checkouts, not a policy you can
+`repos` is a map of working trees, and forge knows three shapes. Scopes that
+share a repository share its working tree, and `lint` will not let two of them
+be in flight at once — that is a property of git checkouts, not a policy you can
 configure away.
+
+| Shape | `repos` | Start from |
+|---|---|---|
+| **Monorepo** | one entry, `"path": "."` | `--preset monorepo` |
+| **Super-repo** | itself plus one entry per submodule, each `"submodule": true` | `--preset submodules` |
+| **Hub** | itself (`"path": "."`, `"role": "harness"`) plus one entry per code repository cloned beside it, each `"path": "../name"` and `"submodule": false` | `--preset siblings` |
+
+The hub shape puts the tracker, the knowledge base and the lessons in their own
+repository and leaves every code repository to develop independently. Two rules
+make it work:
+
+- **Only the hub has a `forge.json`.** forge resolves its root from `--root`,
+  then `$CLAUDE_PROJECT_DIR`, then the location of the script being run, each
+  walking upward. With no local config the first two find nothing and the third
+  lands in the hub, which is how a code repository reaches the board at all:
+
+  ```bash
+  python3 ../hub/.claude/scripts/agile.py show TASK-0231
+  ```
+
+  A second `forge.json` in a code repository captures every command run inside
+  it and quietly keeps a second board. `forge doctor` now fails on this, and on
+  a declared repository that is not where `path` says it is.
+
+- **The guard hooks only fire where the hub is the project root.** Run the gates
+  from the hub with the code repository attached
+  (`cd hub && claude --add-dir ../backend`); a session rooted in the code
+  repository can read the board but nothing protects it from a bad write.
 
 ## Move the tracker or the knowledge base
 

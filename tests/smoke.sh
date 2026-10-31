@@ -756,6 +756,40 @@ then bad "the gate table still hard-codes a trailer"
 else ok "the payload names no commit convention of its own"; fi
 rm -rf "$TRAILER"
 
+echo "== the siblings layout: a hub with code repositories beside it"
+SIB="$WORK/../forge-smoke-sib-$$"
+rm -rf "$SIB"; mkdir -p "$SIB/hub" "$SIB/mealplan-backend" "$SIB/mealplan-web"
+git -C "$SIB/hub" init -q
+"$FORGE/bin/forge" init "$SIB/hub" --preset siblings --name MealPlan >/dev/null 2>&1
+[ -f "$SIB/hub/forge.json" ] \
+  && ok "--preset siblings writes a hub forge.json" || bad "the siblings preset wrote nothing"
+want 0 "doctor accepts a hub whose siblings are all present" \
+  -- python3 "$SIB/hub/.claude/scripts/forge.py" doctor --root "$SIB/hub"
+
+# The two failures a hub shape makes possible, and that doctor was blind to.
+mv "$SIB/mealplan-web" "$SIB/web-moved"
+OUT="$(python3 "$SIB/hub/.claude/scripts/forge.py" doctor --root "$SIB/hub" 2>&1)"
+printf '%s' "$OUT" | grep -q "does not exist" \
+  && ok "doctor names a declared repository that is not there" \
+  || bad "doctor ignored a missing sibling"
+mv "$SIB/web-moved" "$SIB/mealplan-web"
+
+echo '{}' > "$SIB/mealplan-backend/forge.json"
+OUT="$(python3 "$SIB/hub/.claude/scripts/forge.py" doctor --root "$SIB/hub" 2>&1)"
+printf '%s' "$OUT" | grep -q "has its own forge.json" \
+  && ok "doctor catches a code repository that would hijack the harness" \
+  || bad "doctor allowed a second forge.json in a sibling"
+rm "$SIB/mealplan-backend/forge.json"
+
+# A sibling has no forge.json, so the hub's scripts must resolve to the hub from
+# inside it - that is the whole mechanism the layout rests on.
+OUT="$(cd "$SIB/mealplan-backend" && CLAUDE_PROJECT_DIR="$PWD" \
+       python3 "$SIB/hub/.claude/scripts/forge.py" scopes 2>&1)"
+printf '%s' "$OUT" | grep -q "backend" \
+  && ok "a sibling with no forge.json reaches the hub's board" \
+  || bad "the hub's scripts did not resolve to the hub from a sibling"
+rm -rf "$SIB"
+
 echo "== attribution"
 grep -q "github.com/vstlmkh/forge" docs/agile/INDEX.md \
   && ok "the generated board carries the forge line" || bad "the board is unsigned"

@@ -336,6 +336,25 @@ class Config:
             for s in scopes:
                 if s not in self.kb_scopes:
                     out.append(f"kb.locked_types.{t}: '{s}' is not in kb.scopes")
+        # A repository forge was told about but cannot find is invisible
+        # otherwise: every scope looks healthy until a gate tries to cd into it.
+        # In a siblings layout a path also leaves the root, so a typo lands
+        # somewhere plausible rather than failing loudly.
+        for name, repo in self.repos.items():
+            if repo.is_root:
+                continue
+            path = repo.abspath(self.root)
+            if not os.path.isdir(path):
+                out.append(f"repos.{name}.path: '{repo.path}' does not exist - "
+                           "clone it there, or fix the path")
+                continue
+            # The hijack: forge resolves its root from the script's own location
+            # upward, so a code repository carrying its own forge.json captures
+            # every command run inside it and quietly keeps a second board.
+            if os.path.exists(os.path.join(path, CONFIG_NAME)):
+                out.append(f"repos.{name}: '{repo.path}' has its own {CONFIG_NAME} - "
+                           "a code repository must not, or commands run from it "
+                           "resolve to that config instead of this one")
         if not os.path.isdir(self.tracker_dir()):
             out.append(f"paths.tracker: {self.tracker_rel}/ does not exist")
         elif not os.path.isdir(os.path.join(self.tracker_dir(), "specs")):

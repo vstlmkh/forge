@@ -1,0 +1,173 @@
+{
+  "forge_version": "2.5.0",
+  "generator": {
+    "name": "forge",
+    "url": "https://github.com/vstlmkh/forge",
+    "version": "2.5.0"
+  },
+  "attribution": true,
+  "project": {
+    "name": "MealPlan",
+    "description": "A hub repository holding the tracker, the knowledge base and the lessons for code repositories cloned next to it. No application code lives in the hub."
+  },
+  "repos": {
+    "hub": {
+      "path": ".",
+      "branch": "main",
+      "remote": "acme/mealplan-hub",
+      "submodule": false,
+      "role": "harness"
+    },
+    "backend": {
+      "path": "../mealplan-backend",
+      "branch": "master",
+      "remote": "acme/mealplan-backend",
+      "submodule": false
+    },
+    "frontend": {
+      "path": "../mealplan-web",
+      "branch": "main",
+      "remote": "acme/mealplan-web",
+      "submodule": false
+    }
+  },
+  "scopes": {
+    "backend": {
+      "repo": "backend",
+      "agent": "backend-engineer",
+      "kb_scope": "backend",
+      "stack": "PHP 8.4, Laravel 12, Octane, Postgres, Redis",
+      "workdir": "../mealplan-backend",
+      "notes": "The engineering standard for this repository is ../mealplan-backend/AGENTS.md; read it before the first edit. Commands run from the repository, not from the hub."
+    },
+    "frontend": {
+      "repo": "frontend",
+      "agent": "frontend-engineer",
+      "kb_scope": "frontend",
+      "stack": "Next.js 16, React 19, TypeScript, Tailwind",
+      "workdir": "../mealplan-web"
+    },
+    "infra": {
+      "repo": null,
+      "agent": [
+        "backend-engineer",
+        "frontend-engineer"
+      ],
+      "kb_scope": "shared",
+      "code": false
+    },
+    "docs": {
+      "repo": null,
+      "agent": [
+        "backend-engineer",
+        "frontend-engineer",
+        "pm"
+      ],
+      "kb_scope": "shared",
+      "code": false
+    }
+  },
+  "checks": {
+    "backend": [
+      {
+        "id": "tests",
+        "title": "Tests",
+        "command": "make test",
+        "cwd": "../mealplan-backend",
+        "available": true
+      },
+      {
+        "id": "lint",
+        "title": "Style",
+        "command": "make lint",
+        "cwd": "../mealplan-backend",
+        "available": true
+      }
+    ],
+    "frontend": [
+      {
+        "id": "tests",
+        "title": "Tests",
+        "command": "npm test",
+        "cwd": "../mealplan-web",
+        "available": true
+      },
+      {
+        "id": "types",
+        "title": "Types",
+        "command": "npm run typecheck",
+        "cwd": "../mealplan-web",
+        "available": true
+      }
+    ],
+    "infra": [
+      {
+        "id": "tracker",
+        "title": "Tracker integrity",
+        "command": "python3 .claude/scripts/agile.py lint",
+        "available": true
+      }
+    ],
+    "docs": [
+      {
+        "id": "tracker",
+        "title": "Tracker integrity",
+        "command": "python3 .claude/scripts/agile.py lint",
+        "available": true
+      },
+      {
+        "id": "kb",
+        "title": "Knowledge-base integrity",
+        "command": "python3 .claude/scripts/kb.py lint",
+        "available": true
+      }
+    ]
+  },
+  "kb": {
+    "scopes": [
+      "backend",
+      "frontend",
+      "shared"
+    ],
+    "shared_scope": "shared",
+    "locked_types": {
+      "api-contract": [
+        "shared"
+      ]
+    },
+    "forbidden_dirs": []
+  },
+  "git": {
+    "commit_style": "conventional-third-person",
+    "require_refs_trailer": false,
+    "pull_requests": true,
+    "branch_prefixes": [
+      "feat",
+      "fix",
+      "chore",
+      "style",
+      "refactor",
+      "docs",
+      "test",
+      "perf"
+    ],
+    "never_commit": [
+      ".env",
+      "vendor/",
+      "node_modules/",
+      ".next/",
+      "storage/",
+      ".idea/"
+    ]
+  },
+  "policy": {
+    "test_first": true,
+    "spec_first": true,
+    "require_docs": true,
+    "require_lessons": true,
+    "lesson_budget": 12,
+    "lesson_stale_days": 180,
+    "stale_claim_hours": 24,
+    "ticket_consent": "ask"
+  }
+}

@@ -86,7 +86,7 @@ ledger: a change that changed what we know should say so in the same breath.
 # super-repo: stage the submodule too, so the pointer bump and the close are one commit
 git add $REPO docs
 git commit -m "chore: bumps $REPO to ${SHA:0:7} ($ARGUMENTS)"
-# single repo:
+# single repo, or a hub with the code repositories beside it:
 # git add docs && git commit -m "chore(agile): closes $ARGUMENTS at ${SHA:0:7}"
 git push
 ```
@@ -95,6 +95,12 @@ In a super-repo the pointer bump and the `done` transition are **one commit** â€
 that is what makes the log a ledger where every pointer move names the ticket
 behind it. Push the code repository before the super-repo: a pointer to an
 unpushed sha is unclonable.
+
+In a hub shape there is no pointer to bump: the code repository is a sibling
+with its own history, already pushed, and the hub stages only `docs`. Push it
+first all the same â€” a recorded sha nobody can fetch is a dangling reference.
+`python3 .claude/scripts/forge.py repos` says which shape you are in; a `path`
+that leaves the root is a sibling.
 
 ## 4. After
 
