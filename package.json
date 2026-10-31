@@ -1,7 +1,7 @@
 {
   "name": "@vstlmkh/forge",
   "version": "2.5.0",
-  "description": "A reusable agent harness for any repository: test-first ticket cycle, Markdown tracker, typed knowledge base, role agents and the hooks that keep them honest.",
+  "description": "A reusable agent harness for any repository: test-first ticket cycle, Markdown tracker, typed knowledge base, role agents and the hooks that keep them honest. One forge.json describes the project - a monorepo, a super-repo with submodules, or a hub with the code repos beside it.",
   "keywords": [
     "agent",
     "ai-agents",
@@ -11,7 +11,9 @@
     "scaffolding",
     "tracker",
     "knowledge-base",
-    "developer-tools"
+    "developer-tools",
+    "monorepo",
+    "multi-repo"
   ],
   "homepage": "https://github.com/vstlmkh/forge#readme",
   "repository": {
