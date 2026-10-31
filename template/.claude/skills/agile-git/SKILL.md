@@ -165,6 +165,14 @@ committing:
 git diff --cached --submodule    # must be empty for a status-only commit
 ```
 
+In a hub shape - the tracker in its own repository, the code repositories cloned
+beside it - there is no pointer to bump, so kind 3 does not exist. What replaces
+it is a rule: **a code change is committed in its own repository, a tracker,
+knowledge or lesson change in the hub, and never both in one commit.** Run
+`python3 .claude/scripts/forge.py repos` if you are unsure which shape you are
+in; a repo whose `path` leaves the root (`../something`) is a sibling, not a
+submodule.
+
 ## Closing
 
 Only in `/agile:close`, only by the orchestrator, only after the PR is merged.
@@ -180,6 +188,25 @@ git merge-base --is-ancestor $SHA main || { echo "refusing to record"; exit 1; }
 python3 .claude/scripts/agile.py index
 git add docs && git commit -m "chore(agile): closes TASK-0231 at ${SHA:0:7}" && git push
 ```
+
+### Hub with repositories beside it
+
+```bash
+REPO=../mealplan-backend; BR=master; TICKET=TASK-0231
+
+gh pr merge <url> --merge
+git -C $REPO checkout $BR && git -C $REPO pull --ff-only
+SHA=$(git -C $REPO rev-parse HEAD)
+git -C $REPO merge-base --is-ancestor $SHA $BR || { echo "refusing to record"; exit 1; }
+
+# set merge_sha, status: done, assignee: null on the ticket, append to ## Log
+python3 .claude/scripts/agile.py index
+
+git add docs && git commit -m "chore(agile): closes $TICKET at ${SHA:0:7}" && git push
+```
+
+Nothing is staged from `$REPO`: it is a separate repository with its own
+history, already pushed. The hub records the sha, it does not carry the code.
 
 ### Super-repo with submodules
 
@@ -208,10 +235,14 @@ Rules that make this safe:
   what makes the log a ledger: every pointer move names the ticket that caused
   it, and `git show <bump>` displays both the new sha and the closed ticket.
 - **Push the submodule before the super-repo.** A super-repo pointer to an
-  unpushed sha is unclonable for everyone else.
+  unpushed sha is unclonable for everyone else. The same ordering holds in a hub
+  shape for a different reason: a recorded sha nobody else can fetch is a
+  dangling reference.
 - **Never `git add <submodule>` opportunistically.** If `git submodule status`
   shows a moved pointer outside a close, that is an error to report, not a
   change to commit.
+- **The hub is shared.** Pull it with `--rebase` before a claim and push
+  immediately after, so two people cannot hold the same ticket.
 
 ## Recovering from a dirty state
 

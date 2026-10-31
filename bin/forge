@@ -16,7 +16,8 @@ scopes, repositories, owning agents and the Definition-of-Done matrix.
 
 Flags
     --auto                         infer the shape from the repository, ask nothing
-    --preset monorepo|submodules   skip the interview, start from an example
+    --preset monorepo|submodules|siblings
+                                   skip the interview, start from an example
     --name NAME                    project name (default: the directory name)
     --force                        overwrite files that already exist
     --no-claude-md                 do not touch TARGET/CLAUDE.md
@@ -449,21 +450,32 @@ def interview(target: str, name: str) -> dict:
             return finish(project, found["repos"], found["scopes"], found["checks"])
         say("")
 
-    layout = ask("Layout - (1) one repository, (2) super-repo with submodules",
+    layout = ask("Layout - (1) one repository, (2) super-repo with submodules, "
+                 "(3) hub repository with code repositories beside it",
                  "2" if found["submodules"] else "1")
-    submodules = layout.strip().startswith("2")
+    layout = layout.strip()
+    submodules = layout.startswith("2")
+    siblings = layout.startswith("3")
 
     repos: dict = {}
     scopes: dict = {}
     checks: dict = {}
 
-    if submodules:
-        root_branch = ask("Tracked branch of this super-repo", "main")
-        root_remote = ask("Super-repo remote (owner/name, blank to skip)", "")
-        repos["harness"] = {"path": ".", "branch": root_branch, "submodule": False,
-                            "role": "harness"}
+    if submodules or siblings:
+        what = "super-repo" if submodules else "hub"
+        if siblings:
+            say("")
+            say("  The hub holds the tracker, the knowledge base and the lessons, and no")
+            say("  code. Clone every code repository next to it, not inside it, and give")
+            say("  none of them a forge.json of its own - a second one takes over the")
+            say("  harness and splits the board in two.")
+        root_branch = ask(f"Tracked branch of this {what}", "main")
+        root_remote = ask(f"{what.capitalize()} remote (owner/name, blank to skip)", "")
+        key = "harness" if submodules else "hub"
+        repos[key] = {"path": ".", "branch": root_branch, "submodule": False,
+                      "role": "harness"}
         if root_remote:
-            repos["harness"]["remote"] = root_remote
+            repos[key]["remote"] = root_remote
     else:
         root_branch = ask("Tracked branch", "main")
         root_remote = ask("Remote (owner/name, blank to skip)", "")
@@ -480,11 +492,16 @@ def interview(target: str, name: str) -> dict:
     for scope in names:
         say("")
         say(f"-- scope '{scope}'")
-        if submodules:
-            path = ask(f"  submodule path for '{scope}'", scope)
+        if submodules or siblings:
+            if submodules:
+                path = ask(f"  submodule path for '{scope}'", scope)
+            else:
+                path = ask(f"  path to the '{scope}' repository, relative to the hub",
+                           f"../{scope}")
             branch = ask("  its tracked branch", "main")
             remote = ask("  its remote (owner/name, blank to skip)", "")
-            repos[scope] = {"path": path, "branch": branch, "submodule": True}
+            repos[scope] = {"path": path, "branch": branch,
+                            "submodule": bool(submodules)}
             if remote:
                 repos[scope]["remote"] = remote
             repo_key = scope
@@ -802,7 +819,7 @@ def cmd_init(argv: list[str]) -> int:
     elif preset:
         example = os.path.join(TEMPLATE, f"forge.example.{preset}.json")
         if not os.path.exists(example):
-            die(f"unknown preset '{preset}' (monorepo | submodules)")
+            die(f"unknown preset '{preset}' (monorepo | submodules | siblings)")
         cfg = read_json(example)
         cfg["project"]["name"] = name
         write_json(cfg_path, cfg)

@@ -138,9 +138,11 @@ than trusted:
 ```
 
 The scripts, skills, agents and commands read it; none of them hardcode a scope,
-a branch or a command. That is what makes the same harness fit a one-repository
-service and a super-repo with submodules, and what lets the Definition-of-Done
-matrix tighten itself: when a bootstrap ticket makes `mypy` real, flipping
+a branch or a command. That is what makes the same harness fit all three shapes
+forge knows — a one-repository service (`--preset monorepo`), a super-repo with
+submodules (`--preset submodules`), and a hub repository holding the tracker for
+code repositories cloned beside it (`--preset siblings`) — and what lets the
+Definition-of-Done matrix tighten itself: when a bootstrap ticket makes `mypy` real, flipping
 `"available": false` to `true` is part of that ticket's acceptance criteria.
 
 ```bash
