@@ -1094,7 +1094,7 @@ GATES = {
             "Write a test per agreed REQ, matching the existing suite's idiom.",
             "Run them and read the failure. It must fail on the assertion, not on "
             "a missing import.",
-            "Commit the tests alone with a `Refs: {id}` trailer; push.",
+            "Commit the tests alone {commit}; push.",
             "Set branch, status in_progress, assignee {agent}; append the real red "
             "output to '## Log', one line per REQ.",
             "`agile.py lint` clean.",
@@ -1139,7 +1139,7 @@ GATES = {
             "Read the knowledge-base notes named in the reference above before you write code.",
             "Implement until they pass, matching the surrounding idiom.",
             "Run every available check for {scope}, plus the whole suite.",
-            "Commit with a `Refs: {id}` trailer, push, open the PR.",
+            "Commit {commit}, push, open the PR.",
             "File what the work revealed: "
             "`python3 .claude/scripts/kb.py new <type> <scope> \"<description>\" "
             "--ticket {id}`, or argue a NO-DOCS waiver.",
@@ -1279,6 +1279,16 @@ GATES = {
 }
 
 
+def commit_clause(cfg, ident: str) -> str:
+    """How this project wants a code commit shaped. `git.require_refs_trailer`
+    is the switch, and it is read here rather than written into the gate table -
+    a project that turned the trailer off must not be handed a contract that
+    still demands one."""
+    if cfg.require_refs_trailer:
+        return f"with a `Refs: {ident}` trailer"
+    return "as one line, `<type>: <what>`, with no body and no trailer"
+
+
 def gate_context(root: str, a: Artifact, cfg) -> dict:
     """The substitutions a gate's strings may use. Everything concrete comes
     from forge.json at runtime, which is why none of it is written into the
@@ -1305,6 +1315,7 @@ def gate_context(root: str, a: Artifact, cfg) -> dict:
         "agent": owners[0] if owners else "the scope's engineer",
         "others": ", ".join(others) or "none - this project has one code scope",
         "tracker": cfg.tracker_rel,
+        "commit": commit_clause(cfg, a.id),
     }
 
 
@@ -1781,10 +1792,13 @@ def cmd_gates(args: list[str]) -> int:
             return 1
         wanted = {n: GATES[n]}
     # No ticket is in hand here, so the substitutions show their shape rather
-    # than a value. `handoff` is where they are filled from forge.json.
+    # than a value. `handoff` is where they are filled from forge.json. The
+    # commit convention is the exception: it does not vary per ticket, so it is
+    # read from the config and printed as it will really be handed over.
     generic = {"id": "<ID>", "scope": "<scope>", "repo": "<repo>",
                "branch": "<branch>", "agent": "<the scope's engineer>",
-               "others": "<the other scopes>", "tracker": "<tracker>"}
+               "others": "<the other scopes>", "tracker": "<tracker>",
+               "commit": commit_clause(forgecfg.load(find_root(None)), "<ID>")}
     for n, g in sorted(wanted.items()):
         g = {k: (v.format(**generic) if isinstance(v, str) else v)
              for k, v in g.items()}
@@ -1796,6 +1810,10 @@ def cmd_gates(args: list[str]) -> int:
         print(f"  Exit      {g['exit']}")
         print(f"  Failure   {g['failure']}")
         print(f"  Waiver    {g['waiver']}")
+        # The gates that put a commit on a branch also have to say what shape it
+        # takes, because that is a project decision and QA checks it at gate 4.
+        if any("{commit}" in step for step in GATES[n].get("steps") or []):
+            print(f"  Commits   {generic['commit']}")
         print()
     return 0
 

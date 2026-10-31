@@ -631,6 +631,24 @@ def render_claude_block(cfg: dict) -> str:
             "  moved, not turned into a note or a lesson. The board is the set of things\n"
             "  this project decided to do, not the set of things an agent noticed.\n")
 
+    # The commit convention is a project decision (`git.require_refs_trailer`),
+    # so the block states the one that is in force rather than both. A project
+    # that turned the trailer off would otherwise carry a rule its own gates,
+    # rendered from the same flag, do not ask for.
+    if (cfg.get("git") or {}).get("require_refs_trailer", True):
+        commit_rule = (
+            "- **Every code commit carries a `Refs: <TICKET-ID>` trailer.** Conventional\n"
+            "  Commits, third-person verb: `feat: adds price per day to the subscription\n"
+            "  resource`. The trailer is the only link from a line of code back to the\n"
+            "  ticket that asked for it.\n")
+    else:
+        commit_rule = (
+            "- **Every commit message is one line, `<type>: <what>`** - no body, no\n"
+            "  trailers. Conventional Commits, third-person verb: `feat: adds price per\n"
+            "  day to the subscription resource`. The link from code back to the ticket is\n"
+            "  the branch name, the pull request, and the ticket's `branch`, `pr` and\n"
+            "  `merge_sha` fields.\n")
+
     forbidden = (cfg.get("kb") or {}).get("forbidden_dirs") or []
     callout = ""
     if forbidden:
@@ -649,6 +667,7 @@ def render_claude_block(cfg: dict) -> str:
             .replace("{{SCOPE_LIST}}", ", ".join(f"`{k}`" for k in scopes))
             .replace("{{KB_CALLOUT}}", callout)
             .replace("{{CONSENT_RULE}}", consent)
+            .replace("{{COMMIT_RULE}}", commit_rule)
             .replace("{{CREDIT}}", credit(cfg, "markdown")))
 
 

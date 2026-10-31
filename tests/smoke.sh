@@ -716,6 +716,46 @@ printf '%s' "$OUT" | grep -q "backend/app" \
   && ok "detect finds an application nested inside a submodule" \
   || bad "detect did not look inside the submodule"
 
+echo "== the commit convention follows git.require_refs_trailer"
+# The default is on: the payload, the managed block and the gate contract must
+# all ask for a trailer.
+grep -q 'Every code commit carries a `Refs:' CLAUDE.md \
+  && ok "the managed block states the trailer rule when it is on" \
+  || bad "the managed block lost the trailer rule"
+python3 .claude/scripts/agile.py gates 3 | grep -q 'Commits .*Refs:' \
+  && ok "gate 3 hands over the trailer shape" || bad "gate 3 did not name the trailer"
+
+# Turn it off and the same three places must flip - no hand-editing, and
+# `upgrade` must not put the trailer back.
+TRAILER="$WORK/../forge-smoke-trailer-$$"
+rm -rf "$TRAILER"; mkdir -p "$TRAILER/apps/web"
+git -C "$TRAILER" init -q
+echo '{"name":"w","scripts":{"test":"jest"}}' > "$TRAILER/apps/web/package.json"
+"$FORGE/bin/forge" init "$TRAILER" --auto --name NoTrailer >/dev/null 2>&1
+python3 - "$TRAILER/forge.json" <<'EOF'
+import json, sys
+p = sys.argv[1]
+c = json.load(open(p))
+c.setdefault("git", {})["require_refs_trailer"] = False
+json.dump(c, open(p, "w"), indent=2)
+EOF
+"$FORGE/bin/forge" upgrade "$TRAILER" >/dev/null 2>&1
+if grep -q 'Every code commit carries a `Refs:' "$TRAILER/CLAUDE.md"
+then bad "upgrade put the Refs rule back into a project that turned it off"
+else ok "the managed block drops the trailer rule when it is off"; fi
+grep -q 'Every commit message is one line' "$TRAILER/CLAUDE.md" \
+  && ok "the managed block states the one-line rule instead" \
+  || bad "the managed block states no commit rule at all"
+if ( cd "$TRAILER" && python3 .claude/scripts/agile.py gates 3 | grep -q 'Commits .*Refs:' )
+then bad "gate 3 still demands a trailer the project turned off"
+else ok "gate 3 drops the trailer from the contract too"; fi
+( cd "$TRAILER" && python3 .claude/scripts/agile.py gates 3 | grep -q 'Commits .*one line' ) \
+  && ok "gate 3 hands over the one-line shape" || bad "gate 3 named no commit shape"
+if grep -rq 'Refs: {id}' "$TRAILER/.claude/scripts/agile.py"
+then bad "the gate table still hard-codes a trailer"
+else ok "the payload names no commit convention of its own"; fi
+rm -rf "$TRAILER"
+
 echo "== attribution"
 grep -q "github.com/vstlmkh/forge" docs/agile/INDEX.md \
   && ok "the generated board carries the forge line" || bad "the board is unsigned"
