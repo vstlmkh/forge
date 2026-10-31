@@ -50,12 +50,21 @@ feat/add-price-per-day-to-subscription-resource
 fix/onboarding-500-on-empty-answer-list
 ```
 
-No ticket ID in the branch name — traceability comes from the commit trailer.
+No ticket ID in the branch name. What ties the branch back to the ticket is the
+ticket's own `branch` and `pr` fields, which you set when you open the PR.
 
 ## Commit messages
 
 Conventional Commits, with the verb form the project declared in
-`git.commit_style`. The default, `conventional-third-person`, reads:
+`git.commit_style`. The default, `conventional-third-person`, puts a
+third-person verb after the colon.
+
+**Which of the two shapes below applies is not yours to choose.** It is
+`git.require_refs_trailer` in `forge.json`, and the gate contract already states
+the answer — `python3 .claude/scripts/agile.py gates 3` prints it in words, and
+every gate 2 and gate 3 dispatch carries it. Read it there rather than guessing.
+
+With the trailer on (`require_refs_trailer: true`, the default):
 
 ```
 <type>: <third-person verb> <what>
@@ -65,10 +74,21 @@ Conventional Commits, with the verb form the project declared in
 Refs: TASK-0231
 ```
 
+The trailer is then the only link from a line of code back to the ticket that
+asked for it, which is why it is mandatory in every code commit.
+
+With it off (`require_refs_trailer: false`):
+
+```
+<type>: <third-person verb> <what>
+```
+
+One line, no body, no trailers. A project chooses this when the tracker lives
+outside the code repository, so a ticket ID in the message would point at
+nothing a reader of that repository can open; the link is the ticket's `branch`,
+`pr` and `merge_sha` fields instead.
+
 - Subject ≤ 72 characters, lowercase after the colon, no trailing period.
-- **The `Refs:` trailer is mandatory in every code commit** (unless the project
-  set `git.require_refs_trailer: false`). It is the only link from a line of
-  code back to the ticket that asked for it.
 
 ## Never commit
 
@@ -93,9 +113,8 @@ git -C $REPO checkout -b feat/<kebab-description>
 # ... implement, run `forge.py checks <scope>` ...
 
 git -C $REPO add <specific paths>    # never `git add -A` blindly
-git -C $REPO commit -m "feat: adds ...
-
-Refs: TASK-0231"
+git -C $REPO commit -m "feat: adds ..."     # + a `Refs: <ID>` trailer if the
+                                            # project requires one - see above
 git -C $REPO push -u origin feat/<kebab-description>
 gh pr create --repo <owner/name> --base $BR --head feat/<kebab-description> \
   --title "feat: adds ..." --body "<see template below>"

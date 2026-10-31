@@ -162,10 +162,7 @@ means the gate did not land whatever the report said.
   session sets `done` inside `/agile:close`.
 - **An unavailable check is `SKIPPED (<reason> — see TASK-000X)`, never a pass.**
   The matrix is `python3 .claude/scripts/forge.py checks <scope>`.
-- **Every code commit carries a `Refs: <TICKET-ID>` trailer.** Conventional
-  Commits, third-person verb: `feat: adds price per day to the subscription
-  resource`.
-- Never commit anything on the project's never-commit list (`git.never_commit`
+{{COMMIT_RULE}}- Never commit anything on the project's never-commit list (`git.never_commit`
   in `forge.json`). Never push with `--no-verify`.
 
 ## Verify your work before handing it back

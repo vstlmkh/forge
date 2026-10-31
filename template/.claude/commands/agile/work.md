@@ -176,9 +176,9 @@ an invented assertion.
 Dispatch the subagent that owns the ticket's `scope`; the gate 3 payload names
 it. It checks out `qa`'s branch, reads the **spec** rather than the ticket's
 log, runs the tests to see them fail, implements until they pass, runs every
-available check for that scope plus the whole suite, commits with a `Refs:`
-trailer, pushes, opens a PR, files the knowledge-base notes its work revealed,
-and sets `status: review`.
+available check for that scope plus the whole suite, commits the way the gate 3
+payload tells it to, pushes, opens a PR, files the knowledge-base notes its work
+revealed, and sets `status: review`.
 
 Check it landed: `python3 .claude/scripts/agile.py handback $ARGUMENTS --gate 3`.
 

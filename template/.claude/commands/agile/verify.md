@@ -36,7 +36,8 @@ QA must:
   rather than only the new tests, and paste the real output;
 - record every unavailable check as `SKIPPED (<reason> — see TASK-000X)`;
 - confirm the diff is clean of unrelated and ignored files, and that the commits
-  carry a `Refs:` trailer;
+  match the shape `python3 .claude/scripts/agile.py gates 3` prints on its
+  `Commits` line - the project sets it in `git.require_refs_trailer`;
 - for a bug, confirm `## Root cause` is filled and re-run the reproduction;
 - write the verdict into `## Log`, with the red and green output together, and
   move the ticket to `verify` or back to `in_progress`.
